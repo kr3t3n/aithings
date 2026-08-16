@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sqlitecsv — SQLite to CSV</title>
+<meta name="description" content="Drop a .db or .sqlite, pick tables, download CSV or a zip of them. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="sqlitecsv — SQLite to CSV">
+<meta property="og:description" content="Drop a SQLite file, pick tables, download CSV. The file never leaves the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2710%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Ecsv%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.hint{margin:.7rem 0 0;color:var(--muted);font-size:.86rem}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.all{
+  display:flex;align-items:center;gap:.4rem;
+  font-family:var(--mono);font-size:.82rem;color:var(--ink);cursor:pointer;
+}
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.item{border-bottom:1px solid var(--rule)}
+.row{
+  display:grid;grid-template-columns:auto 1fr auto;gap:.35rem .7rem;
+  padding:.85rem 0;align-items:baseline;
+}
+.name{font-family:var(--mono);font-size:.95rem;font-weight:600}
+.meta{grid-column:2/-1;margin:0;color:var(--muted);font-size:.82rem;font-family:var(--mono)}
+.actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.preview{
+  display:block;margin:0 0 .85rem;width:100%;min-height:12rem;max-height:24rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.preview.hidden{display:none}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / sqlitecsv</p>
+    <h1>SQLite to CSV.</h1>
+    <p class="lede">Drop a <code>.db</code> or <code>.sqlite</code>. Tick the tables you want.
+      Download CSV — or a zip of them.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a SQLite file here, or click to choose</strong>
+    .db, .sqlite, or .sqlite3. Nothing is uploaded.
+    <input id="file" type="file" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3,application/x-sqlite3" hidden>
+  </label>
+  <p class="privacy">The file never leaves the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <p class="hint hidden" id="status" role="status"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <label class="all"><input type="checkbox" id="all" checked> All</label>
+      <button type="button" id="zip" disabled>Download zip</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+  <footer>
+    <p>Caps: 25&nbsp;MB. sql.js loads the whole database in this tab, so bigger files freeze the page.
+      Files that are not SQLite, empty databases, and encrypted files fail with an error.
+      This page is not a SQL editor.</p>
+    <p><a href="https://github.com/kr3t3n/sqlitecsv">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/sql-wasm.js"></script>
+<script src="./vendor/jszip.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX = 25 * 1024 * 1024;
+  var MD_MAX_ROWS = 200;
+  var MAGIC = "SQLite format 3";
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var statusEl = document.getElementById("status");
+  var results = document.getElementById("results");
+  var listEl = document.getElementById("list");
+  var countEl = document.getElementById("count");
+  var allEl = document.getElementById("all");
+  var zipBtn = document.getElementById("zip");
+  var SQL = null;
+  var db = null;
+  var tables = [];
+  var baseName = "tables";
+
+  function looksSqlite(u) {
+    if (!u || u.length < 16) return false;
+    var i;
+    for (i = 0; i < 15; i++) {
+      if (u[i] !== MAGIC.charCodeAt(i)) return false;
+    }
+    return u[15] === 0;
+  }
+  function quoteIdent(name) {
+    return '"' + String(name).replace(/"/g, '""') + '"';
+  }
+  function cellString(v) {
+    if (v == null) return "";
+    if (v instanceof Uint8Array) {
+      var hex = "", i, b;
+      for (i = 0; i < v.length; i++) {
+        b = v[i];
+        hex += (b < 16 ? "0" : "") + b.toString(16);
+      }
+      return hex;
+    }
+    return String(v);
+  }
+  function csvEscape(v) {
+    var s = cellString(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function toCsv(columns, values) {
+    var lines = [], i, j, row, cells;
+    cells = [];
+    for (j = 0; j < columns.length; j++) cells.push(csvEscape(columns[j]));
+    lines.push(cells.join(","));
+    for (i = 0; i < values.length; i++) {
+      row = values[i] || [];
+      cells = [];
+      for (j = 0; j < columns.length; j++) cells.push(csvEscape(j < row.length ? row[j] : ""));
+      lines.push(cells.join(","));
+    }
+    return lines.join("\n");
+  }
+  function mdEscape(v) {
+    return cellString(v).replace(/\r\n|\r|\n/g, " ").replace(/\|/g, "\\|");
+  }
+  function toMarkdown(columns, values) {
+    var w = columns.length;
+    if (!w) return "";
+    var lines = [], i, j, cells, n, note;
+    n = Math.min(values.length, MD_MAX_ROWS);
+    note = values.length > MD_MAX_ROWS
+      ? "<!-- first " + MD_MAX_ROWS + " of " + values.length + " rows -->\n"
+      : "";
+    cells = [];
+    for (j = 0; j < w; j++) cells.push(mdEscape(columns[j]));
+    lines.push("| " + cells.join(" | ") + " |");
+    cells = [];
+    for (j = 0; j < w; j++) cells.push("---");
+    lines.push("| " + cells.join(" | ") + " |");
+    for (i = 0; i < n; i++) {
+      cells = [];
+      for (j = 0; j < w; j++) cells.push(mdEscape(values[i] && j < values[i].length ? values[i][j] : ""));
+      lines.push("| " + cells.join(" | ") + " |");
+    }
+    return note + lines.join("\n");
+  }
+  function sanitiseStem(name) {
+    var s = String(name || "tables")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .replace(/\.(db|sqlite3?)$/i, "")
+      .slice(0, 80);
+    return s || "tables";
+  }
+  function sanitisePart(name) {
+    var s = String(name || "table")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .slice(0, 60);
+    return s || "table";
+  }
+  function openError(e) {
+    var m = (e && e.message) ? e.message : String(e);
+    if (/encrypt/i.test(m)) return "This SQLite file is encrypted. This page cannot open it.";
+    if (/not a database/i.test(m)) {
+      return "This is not a readable SQLite database. Drop a .db or .sqlite whose header is SQLite format 3.";
+    }
+    return "Could not open this SQLite file. " + m;
+  }
+  function listTables(database) {
+    var stmt = database.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name COLLATE NOCASE"
+    );
+    var names = [];
+    while (stmt.step()) {
+      var row = stmt.get();
+      if (row && row[0] != null && String(row[0]) !== "") names.push(String(row[0]));
+    }
+    stmt.free();
+    return names;
+  }
+  function rowCount(database, name) {
+    var stmt = database.prepare("SELECT COUNT(*) FROM " + quoteIdent(name));
+    stmt.step();
+    var n = stmt.get()[0];
+    stmt.free();
+    return Number(n) || 0;
+  }
+  function readTable(database, name) {
+    var res = database.exec("SELECT * FROM " + quoteIdent(name));
+    if (res && res[0]) return { columns: res[0].columns, values: res[0].values };
+    var info = database.exec("PRAGMA table_info(" + quoteIdent(name) + ")");
+    var cols = [], i, nameIdx;
+    if (info && info[0]) {
+      nameIdx = info[0].columns.indexOf("name");
+      if (nameIdx < 0) nameIdx = 1;
+      for (i = 0; i < info[0].values.length; i++) cols.push(info[0].values[i][nameIdx]);
+    }
+    return { columns: cols, values: [] };
+  }
+  function ensureData(t) {
+    if (t.csv != null) return t;
+    if (!db) throw new Error("The database is no longer open. Drop the file again.");
+    var data = readTable(db, t.name);
+    t.columns = data.columns;
+    t.values = data.values;
+    t.csv = toCsv(data.columns, data.values);
+    t.md = toMarkdown(data.columns, data.values);
+    return t;
+  }
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    statusEl.classList.add("hidden");
+    tables = [];
+    listEl.innerHTML = "";
+    if (db) {
+      try { db.close(); } catch (e) {}
+      db = null;
+    }
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function setStatus(msg) {
+    if (!msg) {
+      statusEl.textContent = "";
+      statusEl.classList.add("hidden");
+      return;
+    }
+    statusEl.textContent = msg;
+    statusEl.classList.remove("hidden");
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function fileName(table, ext) {
+    var stem = sanitiseStem(baseName);
+    if (tables.length > 1) stem = stem + "-" + sanitisePart(table.name);
+    return stem + ext;
+  }
+  function selected() {
+    return tables.filter(function (t) { return t.on; });
+  }
+  function syncAll() {
+    var n = selected().length;
+    allEl.checked = tables.length > 0 && n === tables.length;
+    zipBtn.disabled = n < 2;
+  }
+  function hidePreviews(except) {
+    listEl.querySelectorAll(".preview").forEach(function (el) {
+      if (el !== except) el.classList.add("hidden");
+    });
+  }
+  function openPreview(i, text, select) {
+    var box = listEl.querySelector('.preview[data-i="' + i + '"]');
+    if (!box) return;
+    hidePreviews(box);
+    box.value = text;
+    box.classList.remove("hidden");
+    if (select) {
+      box.focus();
+      box.select();
+    }
+  }
+  function render() {
+    listEl.innerHTML = "";
+    var n = tables.length;
+    countEl.textContent = n + (n === 1 ? " table" : " tables") + " · " + sanitiseStem(baseName);
+    tables.forEach(function (table, i) {
+      var li = document.createElement("li");
+      li.className = "item";
+      var row = document.createElement("div");
+      row.className = "row";
+      var check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = table.on;
+      check.setAttribute("data-i", String(i));
+      check.setAttribute("aria-label", "Include " + table.name);
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = table.name;
+      var actions = document.createElement("span");
+      actions.className = "actions";
+      [["copy", "Copy"], ["csv", "CSV"], ["md", "MD"]].forEach(function (pair) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("data-act", pair[0]);
+        btn.setAttribute("data-i", String(i));
+        btn.textContent = pair[1];
+        actions.appendChild(btn);
+      });
+      var meta = document.createElement("p");
+      meta.className = "meta";
+      meta.textContent = table.count + (table.count === 1 ? " row" : " rows");
+      row.appendChild(check);
+      row.appendChild(name);
+      row.appendChild(actions);
+      row.appendChild(meta);
+      var preview = document.createElement("textarea");
+      preview.className = "preview hidden";
+      preview.readOnly = true;
+      preview.setAttribute("data-i", String(i));
+      preview.setAttribute("aria-label", "CSV preview");
+      li.appendChild(row);
+      li.appendChild(preview);
+      listEl.appendChild(li);
+    });
+    results.classList.remove("hidden");
+    syncAll();
+  }
+  async function getSQL() {
+    if (SQL) return SQL;
+    if (typeof initSqlJs !== "function") throw new Error("sql.js failed to load.");
+    SQL = await initSqlJs({
+      locateFile: function (f) { return "./vendor/" + f; }
+    });
+    return SQL;
+  }
+  async function handleFile(file) {
+    clearError();
+    setStatus("");
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("This file is larger than 25 MB. sql.js loads the whole database in this tab, so bigger files freeze the page. Save a smaller copy and drop that.");
+      return;
+    }
+    try {
+      setStatus("Opening…");
+      var buf = await file.arrayBuffer();
+      var u = new Uint8Array(buf);
+      if (!looksSqlite(u)) {
+        showError("This is not a SQLite database. Drop a .db or .sqlite. The header must be SQLite format 3.");
+        return;
+      }
+      var Mod = await getSQL();
+      if (db) {
+        try { db.close(); } catch (e) {}
+        db = null;
+      }
+      try {
+        db = new Mod.Database(u);
+      } catch (e) {
+        showError(openError(e));
+        return;
+      }
+      var names = listTables(db);
+      if (!names.length) {
+        showError("This database has no tables.");
+        return;
+      }
+      baseName = sanitiseStem(file.name);
+      tables = names.map(function (name) {
+        var count;
+        try {
+          count = rowCount(db, name);
+        } catch (e) {
+          count = 0;
+        }
+        return { name: name, count: count, on: true, columns: null, values: null, csv: null, md: null };
+      });
+      setStatus("");
+      render();
+    } catch (e) {
+      showError(openError(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  allEl.addEventListener("change", function () {
+    var on = allEl.checked;
+    tables.forEach(function (t) { t.on = on; });
+    listEl.querySelectorAll('input[type="checkbox"][data-i]').forEach(function (el) {
+      el.checked = on;
+    });
+    syncAll();
+  });
+  listEl.addEventListener("change", function (e) {
+    var box = e.target.closest('input[type="checkbox"][data-i]');
+    if (!box) return;
+    var i = Number(box.getAttribute("data-i"));
+    if (!tables[i]) return;
+    tables[i].on = box.checked;
+    syncAll();
+  });
+  listEl.addEventListener("click", async function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    var i = Number(btn.getAttribute("data-i"));
+    var act = btn.getAttribute("data-act");
+    var table = tables[i];
+    if (!table) return;
+    try {
+      ensureData(table);
+    } catch (err) {
+      showError(err.message || String(err));
+      return;
+    }
+    if (act === "copy") {
+      openPreview(i, table.csv, false);
+      try {
+        await navigator.clipboard.writeText(table.csv);
+        btn.textContent = "Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+      } catch (err) {
+        openPreview(i, table.csv, true);
+      }
+    } else if (act === "csv") {
+      downloadBlob(new Blob([table.csv], { type: "text/csv;charset=utf-8" }), fileName(table, ".csv"));
+    } else if (act === "md") {
+      downloadBlob(new Blob([table.md], { type: "text/markdown;charset=utf-8" }), fileName(table, ".md"));
+    }
+  });
+  zipBtn.addEventListener("click", async function () {
+    var pick = selected();
+    if (pick.length < 2) return;
+    try {
+      var zip = new JSZip();
+      var used = {};
+      pick.forEach(function (table) {
+        ensureData(table);
+        var part = sanitisePart(table.name) + ".csv";
+        var name = part;
+        var n = 2;
+        while (used[name]) {
+          name = sanitisePart(table.name) + "-" + n + ".csv";
+          n++;
+        }
+        used[name] = true;
+        zip.file(name, table.csv);
+      });
+      var blob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(blob, sanitiseStem(baseName) + ".zip");
+    } catch (err) {
+      showError(err.message || String(err));
+    }
+  });
+
+  window.Sqlitecsv = {
+    MAX: MAX,
+    looksSqlite: looksSqlite,
+    quoteIdent: quoteIdent,
+    cellString: cellString,
+    toCsv: toCsv,
+    toMarkdown: toMarkdown,
+    sanitiseStem: sanitiseStem,
+    sanitisePart: sanitisePart,
+    openError: openError,
+    listTables: listTables,
+    rowCount: rowCount,
+    readTable: readTable
+  };
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "3bae508abb554ca78287d201acefa675"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
