@@ -141,6 +141,7 @@ footer p{margin:.4rem 0 0}
   <p class="privacy">Files never leave the browser. There is no server and no account.</p>
   <p class="err hidden" id="err" role="alert"></p>
   <p class="warn hidden" id="warn" role="status"></p>
+  <p class="hint hidden" id="status" role="status"></p>
   <div id="results" class="panel hidden">
     <p class="meta" id="summary"></p>
     <div class="presets" id="presets" role="group" aria-label="Presets"></div>
@@ -162,10 +163,10 @@ footer p{margin:.4rem 0 0}
     <textarea class="preview hidden" id="preview" readonly aria-label="CSV preview"></textarea>
   </div>
   <footer>
-    <p>Caps: warn over 80&nbsp;MB, refuse over 250&nbsp;MB (and anything multi-GB).
-      Unknown files and ZIPs without
-      <code>export.xml</code> fail with an error. Clinical / CDA / ECG files are ignored.
-      Record and Workout only.</p>
+    <p>Caps: warn if the zip is over 80&nbsp;MB or <code>export.xml</code> inside is over 200&nbsp;MB
+      (a 107&nbsp;MB zip with a ~1&nbsp;GB <code>export.xml</code> is streamed, not refused).
+      Refuse only a zip over 500&nbsp;MB compressed, or a zip with no <code>export.xml</code>.
+      <code>export_cda.xml</code> and workout-routes are skipped. Record and Workout only.</p>
     <p><a href="https://github.com/kr3t3n/healthcsv">source</a>
       · <a href="https://aithings.online">aithings.online</a>
       · <a href="https://x.com/georgipep">Georgi</a></p>
@@ -176,7 +177,8 @@ footer p{margin:.4rem 0 0}
 (function () {
   "use strict";
   var WARN_BYTES = 80 * 1024 * 1024;
-  var REFUSE_BYTES = 250 * 1024 * 1024;
+  var WARN_UNCOMPRESSED = 200 * 1024 * 1024;
+  var REFUSE_ZIP_BYTES = 500 * 1024 * 1024;
   var TAG_RE = /<(Record|Workout)\b([^>]*)>/g;
   var ATTR_RE = /([A-Za-z_][\w:.-]*)="([^"]*)"/g;
   var DATE_RE = /^(\d{4}-\d{2}-\d{2})/;
@@ -209,6 +211,7 @@ footer p{margin:.4rem 0 0}
   var input = document.getElementById("file");
   var errEl = document.getElementById("err");
   var warnEl = document.getElementById("warn");
+  var statusEl = document.getElementById("status");
   var results = document.getElementById("results");
   var summaryEl = document.getElementById("summary");
   var presetsEl = document.getElementById("presets");
@@ -222,8 +225,24 @@ footer p{margin:.4rem 0 0}
   var jsonBtn = document.getElementById("dljson");
   var previewEl = document.getElementById("preview");
 
-  var state = { xml: "", types: [], minD: "", maxD: "", n: 0, csv: "", json: "", rows: 0, preset: "" };
+  var state = emptyState();
+  var busy = false;
 
+  function emptyState() {
+    return {
+      source: null,
+      types: [],
+      minD: "",
+      maxD: "",
+      n: 0,
+      csv: "",
+      json: "",
+      rows: 0,
+      preset: "",
+      filtered: null,
+      filterKey: ""
+    };
+  }
   function showError(msg) {
     errEl.textContent = msg;
     errEl.classList.remove("hidden");
@@ -240,15 +259,21 @@ footer p{margin:.4rem 0 0}
     warnEl.textContent = "";
     warnEl.classList.add("hidden");
   }
+  function showStatus(msg) {
+    if (!statusEl) return;
+    statusEl.textContent = msg || "";
+    if (msg) statusEl.classList.remove("hidden");
+    else statusEl.classList.add("hidden");
+  }
   function fmtBytes(n) {
+    if (!n && n !== 0) return "";
     if (n < 1024) return n + " B";
     if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    if (n >= 900 * 1024 * 1024) return "~" + (n / (1024 * 1024 * 1024)).toFixed(1) + " GB";
     return (n / (1024 * 1024)).toFixed(1) + " MB";
   }
-  function ascii(u, i, n) {
-    var s = "";
-    for (var k = 0; k < n && i + k < u.length; k++) s += String.fromCharCode(u[i + k]);
-    return s;
+  function sizePairMessage(zipBytes, xmlBytes) {
+    return "ZIP is " + fmtBytes(zipBytes) + " but export.xml inside is " + fmtBytes(xmlBytes);
   }
   function isZip(buf) {
     var u = new Uint8Array(buf);
@@ -273,18 +298,10 @@ footer p{margin:.4rem 0 0}
   function isWorkoutType(t) {
     return t.kind === "Workout" || t.type === "Workout" || t.type.indexOf("HKWorkoutActivityType") === 0;
   }
-  function looksHealth(text) {
-    if (!text || text.length < 40) return false;
-    if (text.indexOf("<ClinicalDocument") !== -1 && text.indexOf("<HealthData") === -1) return false;
-    if (text.indexOf("<HealthData") !== -1) return true;
-    if (text.indexOf("HKQuantityTypeIdentifier") !== -1) return true;
-    if (text.indexOf("HKCategoryTypeIdentifier") !== -1) return true;
-    if (text.indexOf("HKWorkoutActivityType") !== -1) return true;
-    if (/<Record\b[^>]*\btype="HK/.test(text)) return true;
+  function looksHealthFlags(flags) {
+    if (flags.healthData) return true;
+    if (flags.hk) return true;
     return false;
-  }
-  function looksCda(text) {
-    return text.indexOf("<ClinicalDocument") !== -1 || text.indexOf("export_cda") !== -1;
   }
   function addDays(ymd, days) {
     var p = ymd.split("-");
@@ -312,16 +329,59 @@ footer p{margin:.4rem 0 0}
     if (!minD || !maxD) return minD || "";
     return clampFrom(addDays(maxD, -89), minD);
   }
-  function scanHealth(xml) {
+  function rowFrom(kind, type, attrs) {
+    return {
+      kind: kind,
+      type: type,
+      startDate: attrs.startDate || "",
+      endDate: attrs.endDate || "",
+      value: attrs.value || "",
+      unit: attrs.unit || "",
+      sourceName: attrs.sourceName || "",
+      duration: attrs.duration || "",
+      durationUnit: attrs.durationUnit || "",
+      totalDistance: attrs.totalDistance || "",
+      totalDistanceUnit: attrs.totalDistanceUnit || "",
+      totalEnergyBurned: attrs.totalEnergyBurned || "",
+      totalEnergyBurnedUnit: attrs.totalEnergyBurnedUnit || ""
+    };
+  }
+  function noteFlags(chunk, flags) {
+    if (!flags.healthData && chunk.indexOf("<HealthData") !== -1) flags.healthData = true;
+    if (!flags.cda && chunk.indexOf("<ClinicalDocument") !== -1) flags.cda = true;
+    if (!flags.hk) {
+      if (chunk.indexOf("HKQuantityTypeIdentifier") !== -1) flags.hk = true;
+      else if (chunk.indexOf("HKCategoryTypeIdentifier") !== -1) flags.hk = true;
+      else if (chunk.indexOf("HKWorkoutActivityType") !== -1) flags.hk = true;
+    }
+  }
+  function typeList(types) {
+    var list = [];
+    for (var k in types) {
+      if (Object.prototype.hasOwnProperty.call(types, k)) list.push(types[k]);
+    }
+    list.sort(function (a, b) {
+      return b.count - a.count || (a.type < b.type ? -1 : a.type > b.type ? 1 : 0);
+    });
+    return list;
+  }
+  function makeParser(opts) {
+    opts = opts || {};
     var types = {};
     var minD = "", maxD = "", n = 0;
-    TAG_RE.lastIndex = 0;
-    var m;
-    while ((m = TAG_RE.exec(xml))) {
-      var kind = m[1];
-      var attrs = parseAttrs(m[2]);
+    var rows = [];
+    var keepRows = !!opts.keepRows;
+    var selected = opts.selected || null;
+    var from = opts.from || "";
+    var to = opts.to || "";
+    var flags = { healthData: false, cda: false, hk: false };
+    var carry = "";
+    var bytes = 0;
+
+    function onTag(kind, attrStr) {
+      var attrs = parseAttrs(attrStr);
       var type = typeOf(kind, attrs);
-      if (!type) continue;
+      if (!type) return;
       n++;
       if (!types[type]) types[type] = { type: type, kind: kind, count: 0 };
       types[type].count++;
@@ -330,46 +390,59 @@ footer p{margin:.4rem 0 0}
         if (!minD || dk < minD) minD = dk;
         if (!maxD || dk > maxD) maxD = dk;
       }
+      if (!keepRows) return;
+      if (selected && !selected[type]) return;
+      if ((from || to) && !dk) return;
+      if (from && dk < from) return;
+      if (to && dk > to) return;
+      rows.push(rowFrom(kind, type, attrs));
     }
-    var list = [];
-    for (var k in types) {
-      if (Object.prototype.hasOwnProperty.call(types, k)) list.push(types[k]);
+    function feed(chunk) {
+      if (!chunk) return;
+      bytes += chunk.length;
+      noteFlags(chunk, flags);
+      var text = carry + chunk;
+      var last = text.lastIndexOf(">");
+      if (last === -1) {
+        carry = text.length > 262144 ? text.slice(-65536) : text;
+        return;
+      }
+      var complete = text.slice(0, last + 1);
+      carry = text.slice(last + 1);
+      if (carry.length > 262144) carry = carry.slice(-4096);
+      TAG_RE.lastIndex = 0;
+      var m;
+      while ((m = TAG_RE.exec(complete))) onTag(m[1], m[2]);
     }
-    list.sort(function (a, b) {
-      return b.count - a.count || (a.type < b.type ? -1 : a.type > b.type ? 1 : 0);
-    });
-    return { types: list, minD: minD, maxD: maxD, n: n };
+    function finish() {
+      if (carry) {
+        noteFlags(carry, flags);
+        TAG_RE.lastIndex = 0;
+        var m;
+        while ((m = TAG_RE.exec(carry))) onTag(m[1], m[2]);
+        carry = "";
+      }
+      return {
+        types: typeList(types),
+        minD: minD,
+        maxD: maxD,
+        n: n,
+        rows: rows,
+        flags: flags,
+        bytes: bytes
+      };
+    }
+    return { feed: feed, finish: finish };
+  }
+  function scanHealth(xml) {
+    var p = makeParser({ keepRows: false });
+    p.feed(xml);
+    return p.finish();
   }
   function collectRows(xml, selected, from, to) {
-    var rows = [];
-    TAG_RE.lastIndex = 0;
-    var m;
-    while ((m = TAG_RE.exec(xml))) {
-      var kind = m[1];
-      var attrs = parseAttrs(m[2]);
-      var type = typeOf(kind, attrs);
-      if (!type || !selected[type]) continue;
-      var dk = dateKey(attrs.startDate || attrs.endDate);
-      if ((from || to) && !dk) continue;
-      if (from && dk < from) continue;
-      if (to && dk > to) continue;
-      rows.push({
-        kind: kind,
-        type: type,
-        startDate: attrs.startDate || "",
-        endDate: attrs.endDate || "",
-        value: attrs.value || "",
-        unit: attrs.unit || "",
-        sourceName: attrs.sourceName || "",
-        duration: attrs.duration || "",
-        durationUnit: attrs.durationUnit || "",
-        totalDistance: attrs.totalDistance || "",
-        totalDistanceUnit: attrs.totalDistanceUnit || "",
-        totalEnergyBurned: attrs.totalEnergyBurned || "",
-        totalEnergyBurnedUnit: attrs.totalEnergyBurnedUnit || ""
-      });
-    }
-    return rows;
+    var p = makeParser({ keepRows: true, selected: selected, from: from || "", to: to || "" });
+    p.feed(xml);
+    return p.finish().rows;
   }
   function csvCell(s) {
     s = s == null ? "" : String(s);
@@ -420,6 +493,15 @@ footer p{margin:.4rem 0 0}
       btns[i].classList.toggle("on", btns[i].getAttribute("data-id") === state.preset);
     }
   }
+  function currentFilterKey() {
+    var sel = selectedTypes();
+    var keys = [];
+    for (var k in sel.map) {
+      if (sel.map[k]) keys.push(k);
+    }
+    keys.sort();
+    return keys.join("|") + "\n" + (fromEl.value || "") + "\n" + (toEl.value || "");
+  }
   function applyPreset(preset) {
     var r = rangeForPreset(preset, state.minD, state.maxD);
     fromEl.value = r.from;
@@ -428,21 +510,30 @@ footer p{margin:.4rem 0 0}
     markPreset(preset.id);
     clearBuilt();
     refreshButtons();
+    streamFilter({ autoPreview: true }).catch(function (e) {
+      showError(e.message || String(e));
+    });
   }
   function clearBuilt() {
     state.csv = "";
     state.json = "";
     state.rows = 0;
+    state.filtered = null;
+    state.filterKey = "";
     previewEl.value = "";
     previewEl.classList.add("hidden");
   }
+  function hasSource() {
+    return !!(state.source && (state.source.zip || state.source.file || state.source.xmlChunksOk));
+  }
   function refreshButtons() {
-    var on = selectedTypes().n > 0 && !!state.xml;
+    var on = selectedTypes().n > 0 && hasSource() && !busy;
     exportBtn.disabled = !on;
     copyBtn.disabled = !on;
     csvBtn.disabled = !on;
     jsonBtn.disabled = !on;
-    if (!on) countEl.textContent = "Click a preset, or tick types.";
+    if (busy) countEl.textContent = "Streaming export.xml…";
+    else if (!on) countEl.textContent = "Click a preset, or tick types.";
     else if (!state.csv) countEl.textContent = "Export only the ticked types in range.";
   }
   function shortType(t) {
@@ -495,6 +586,7 @@ footer p{margin:.4rem 0 0}
       var name = names[i];
       var f = zip.files[name];
       if (!f || f.dir) continue;
+      if (/workout-routes\//i.test(name)) continue;
       var base = name.split("/").pop();
       if (base === "export_cda.xml") continue;
       if (base === "export.xml") hits.push(name);
@@ -506,8 +598,14 @@ footer p{margin:.4rem 0 0}
     });
     return hits[0] || null;
   }
+  function entryUncompressed(entry) {
+    if (!entry) return 0;
+    if (entry._data && typeof entry._data.uncompressedSize === "number") return entry._data.uncompressedSize;
+    if (typeof entry.uncompressedSize === "number") return entry.uncompressedSize;
+    return 0;
+  }
   function resetUi() {
-    state = { xml: "", types: [], minD: "", maxD: "", n: 0, csv: "", json: "", rows: 0, preset: "" };
+    state = emptyState();
     results.classList.add("hidden");
     typesEl.textContent = "";
     summaryEl.textContent = "";
@@ -520,19 +618,18 @@ footer p{margin:.4rem 0 0}
     previewEl.value = "";
     previewEl.classList.add("hidden");
     markPreset("");
+    showStatus("");
   }
-  function applyScan(xml, extraWarn) {
-    if (looksCda(xml) && !looksHealth(xml)) {
+  function applyScanResult(scanned, extraWarn) {
+    if (scanned.flags && scanned.flags.cda && !looksHealthFlags(scanned.flags)) {
       throw new Error("That looks like export_cda.xml. Use export.xml from the Apple Health zip.");
     }
-    if (!looksHealth(xml)) {
+    if (!looksHealthFlags(scanned.flags) && !scanned.n) {
       throw new Error("Not an Apple Health export. Expected HealthData XML with Record or Workout entries.");
     }
-    var scanned = scanHealth(xml);
     if (!scanned.n) {
       throw new Error("No Record or Workout entries found.");
     }
-    state.xml = xml;
     state.types = scanned.types;
     state.minD = scanned.minD;
     state.maxD = scanned.maxD;
@@ -548,13 +645,104 @@ footer p{margin:.4rem 0 0}
     renderPresets();
     var range = (scanned.minD && scanned.maxD) ? (scanned.minD + " → " + scanned.maxD) : "no dates";
     summaryEl.textContent = scanned.types.length + " types · " + scanned.n + " records · " + range +
-      ". Preset ranges use the file’s latest date.";
+      ". Preset ranges use the file’s latest date. export.xml is streamed; only matching rows are kept.";
     results.classList.remove("hidden");
     refreshButtons();
     if (extraWarn) showWarn(extraWarn);
   }
-  async function xmlFromZip(buf) {
+  function yieldTick() {
+    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+  }
+  function streamZipEntry(entry, onChunk) {
+    return new Promise(function (resolve, reject) {
+      if (!entry || typeof entry.internalStream !== "function") {
+        reject(new Error("Could not stream export.xml from this ZIP."));
+        return;
+      }
+      var s = entry.internalStream("uint8array");
+      var decoder = new TextDecoder("utf-8", { fatal: false });
+      var n = 0;
+      s.on("data", function (data) {
+        var text = decoder.decode(data, { stream: true });
+        onChunk(text);
+        n++;
+        if (n % 8 === 0) {
+          s.pause();
+          setTimeout(function () { s.resume(); }, 0);
+        }
+      });
+      s.on("error", function (e) {
+        reject(e instanceof Error ? e : new Error(String(e)));
+      });
+      s.on("end", function () {
+        var tail = decoder.decode();
+        if (tail) onChunk(tail);
+        resolve();
+      });
+      s.resume();
+    });
+  }
+  async function streamFileBytes(file, onChunk) {
+    var decoder = new TextDecoder("utf-8", { fatal: false });
+    if (file.stream) {
+      var reader = file.stream().getReader();
+      var i = 0;
+      while (true) {
+        var r = await reader.read();
+        if (r.done) {
+          var tail = decoder.decode();
+          if (tail) onChunk(tail);
+          return;
+        }
+        onChunk(decoder.decode(r.value, { stream: true }));
+        if (++i % 8 === 0) await yieldTick();
+      }
+    }
+    var pos = 0;
+    var chunk = 1024 * 1024;
+    while (pos < file.size) {
+      var buf = await file.slice(pos, Math.min(file.size, pos + chunk)).arrayBuffer();
+      onChunk(decoder.decode(new Uint8Array(buf), { stream: true }));
+      pos += chunk;
+      await yieldTick();
+    }
+    var end = decoder.decode();
+    if (end) onChunk(end);
+  }
+  async function streamSource(onChunk) {
+    var src = state.source;
+    if (!src) throw new Error("Drop export.xml or the zip that contains it.");
+    if (src.kind === "zip") {
+      var entry = src.zip.files[src.path];
+      if (!entry) throw new Error("This ZIP has no export.xml. Apple Health zips contain apple_health_export/export.xml (CDA is ignored).");
+      await streamZipEntry(entry, onChunk);
+      return;
+    }
+    if (src.kind === "file") {
+      await streamFileBytes(src.file, onChunk);
+      return;
+    }
+    throw new Error("Drop export.xml or the zip that contains it.");
+  }
+  async function runParserOnSource(opts) {
+    var parser = makeParser(opts);
+    var n = 0;
+    await streamSource(function (chunk) {
+      parser.feed(chunk);
+      n++;
+    });
+    return parser.finish();
+  }
+  async function openZipSource(file) {
+    if (file.size > REFUSE_ZIP_BYTES) {
+      throw new Error("This ZIP is " + fmtBytes(file.size) + " compressed. A file that big cannot be streamed in the tab.");
+    }
     if (typeof JSZip === "undefined") throw new Error("ZIP support failed to load.");
+    showStatus("Opening zip…");
+    var buf = await file.arrayBuffer();
+    if (!isZip(buf)) {
+      throw new Error("Not a ZIP, or the ZIP is damaged.");
+    }
     var zip;
     try { zip = await JSZip.loadAsync(buf); }
     catch (e) { throw new Error("Not a ZIP, or the ZIP is damaged."); }
@@ -563,60 +751,92 @@ footer p{margin:.4rem 0 0}
       throw new Error("This ZIP has no export.xml. Apple Health zips contain apple_health_export/export.xml (CDA is ignored).");
     }
     var entry = zip.files[path];
-    var raw = entry._data && typeof entry._data.uncompressedSize === "number"
-      ? entry._data.uncompressedSize
-      : (typeof entry.uncompressedSize === "number" ? entry.uncompressedSize : 0);
-    if (raw > REFUSE_BYTES) {
-      throw new Error("export.xml inside this ZIP is larger than 250 MB. A file that big would freeze the tab.");
+    var raw = entryUncompressed(entry);
+    return {
+      kind: "zip",
+      zip: zip,
+      path: path,
+      file: file,
+      zipSize: file.size,
+      uncompressed: raw
+    };
+  }
+  function warnForSource(src) {
+    if (!src) return "";
+    if (src.kind === "zip") {
+      var zipBig = src.zipSize > WARN_BYTES;
+      var xmlBig = src.uncompressed > WARN_UNCOMPRESSED;
+      if (zipBig || xmlBig) {
+        var pair = sizePairMessage(src.zipSize, src.uncompressed || 0);
+        return pair + ". Streaming a filter; the tab may get slow. Use a preset or a short date range.";
+      }
+      return "";
     }
-    var xml = await entry.async("string");
-    if (xml.length > REFUSE_BYTES) {
-      throw new Error("export.xml inside this ZIP is larger than 250 MB. A file that big would freeze the tab.");
+    if (src.file && src.file.size > WARN_BYTES) {
+      return "This file is " + fmtBytes(src.file.size) + ". Streaming a filter; the tab may get slow. Use a preset or a short date range.";
     }
-    return { xml: xml, warnSize: raw || xml.length };
+    return "";
   }
   async function handleFile(file) {
-    if (!file) return;
+    if (!file || busy) return;
     clearError();
     clearWarn();
     resetUi();
-    if (file.size > REFUSE_BYTES) {
-      showError("This file is larger than 250 MB. A file that big would freeze the tab.");
-      return;
-    }
-    var sizeWarn = "";
-    if (file.size > WARN_BYTES) {
-      sizeWarn = "This file is " + fmtBytes(file.size) + ". The tab may get slow. Use a preset or a short date range.";
-    }
+    busy = true;
     try {
-      var buf = await file.arrayBuffer();
-      var xml = "";
-      var innerWarn = 0;
-      if (isZip(buf)) {
-        var got = await xmlFromZip(buf);
-        xml = got.xml;
-        innerWarn = got.warnSize;
+      var head = await file.slice(0, 4).arrayBuffer();
+      var src;
+      if (isZip(head)) {
+        src = await openZipSource(file);
       } else {
-        var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-        var trimmed = text.replace(/^\uFEFF/, "").replace(/^\s+/, "");
-        if (trimmed.charAt(0) !== "<") {
-          throw new Error("Not an Apple Health export. Drop export.xml or the zip that contains it.");
-        }
-        xml = text;
+        src = { kind: "file", file: file, zipSize: 0, uncompressed: file.size };
       }
-      if (innerWarn > WARN_BYTES && !sizeWarn) {
-        sizeWarn = "export.xml is " + fmtBytes(innerWarn) + ". The tab may get slow. Use a preset or a short date range.";
-      }
-      applyScan(xml, sizeWarn);
+      state.source = src;
+      showStatus("Streaming export.xml for types and dates…");
+      var scanned = await runParserOnSource({ keepRows: false });
+      applyScanResult(scanned, warnForSource(src));
+      showStatus("Streamed " + fmtBytes(scanned.bytes) + " of export.xml. Counts only — click a preset to keep matching rows.");
     } catch (e) {
       resetUi();
       showError(e.message || String(e));
+    } finally {
+      busy = false;
+      refreshButtons();
     }
   }
-  function currentRows() {
+  async function streamFilter(opts) {
+    opts = opts || {};
+    if (!state.source) throw new Error("Drop export.xml or the zip that contains it.");
     var sel = selectedTypes();
     if (!sel.n) throw new Error("Pick at least one type.");
-    return collectRows(state.xml, sel.map, fromEl.value || "", toEl.value || "");
+    var key = currentFilterKey();
+    if (state.filtered && state.filterKey === key) return state.filtered;
+    busy = true;
+    refreshButtons();
+    showStatus("Streaming export.xml with the selected filter…");
+    try {
+      var scanned = await runParserOnSource({
+        keepRows: true,
+        selected: sel.map,
+        from: fromEl.value || "",
+        to: toEl.value || ""
+      });
+      state.filtered = scanned.rows;
+      state.filterKey = key;
+      if (opts.autoPreview) {
+        var csv = toCsv(scanned.rows);
+        state.rows = scanned.rows.length;
+        state.csv = csv;
+        state.json = JSON.stringify(scanned.rows);
+        countEl.textContent = scanned.rows.length + " rows · " + fmtBytes(csv.length);
+        previewCsv(csv);
+      }
+      showStatus("Kept " + scanned.rows.length + " matching rows. export.xml was not loaded as one string.");
+      return scanned.rows;
+    } finally {
+      busy = false;
+      refreshButtons();
+    }
   }
   function previewCsv(csv) {
     var lines = csv.split("\n");
@@ -628,8 +848,8 @@ footer p{margin:.4rem 0 0}
     }
     previewEl.classList.remove("hidden");
   }
-  function buildExport() {
-    var rows = currentRows();
+  async function buildExport() {
+    var rows = await streamFilter();
     var csv = toCsv(rows);
     state.rows = rows.length;
     state.csv = csv;
@@ -645,10 +865,18 @@ footer p{margin:.4rem 0 0}
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
   }
+  function withBusy(fn) {
+    return function () {
+      if (busy) return;
+      Promise.resolve()
+        .then(fn)
+        .catch(function (e) { showError(e.message || String(e)); });
+    };
+  }
 
-  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("click", function () { if (!busy) input.click(); });
   drop.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!busy) input.click(); }
   });
   drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
@@ -668,34 +896,34 @@ footer p{margin:.4rem 0 0}
   });
   fromEl.addEventListener("change", function () { clearBuilt(); refreshButtons(); });
   toEl.addEventListener("change", function () { clearBuilt(); refreshButtons(); });
-  exportBtn.addEventListener("click", function () {
-    try { buildExport(); } catch (e) { showError(e.message || String(e)); }
-  });
-  copyBtn.addEventListener("click", function () {
-    try {
-      if (!state.csv) buildExport();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(state.csv).then(function () {
-          copyBtn.textContent = "Copied";
-          setTimeout(function () { copyBtn.textContent = "Copy CSV"; }, 1200);
-        }).catch(function () { showError("Could not copy. Download the CSV instead."); });
-      } else {
+  exportBtn.addEventListener("click", withBusy(function () { return buildExport(); }));
+  copyBtn.addEventListener("click", withBusy(function () {
+    return Promise.resolve()
+      .then(function () { return state.csv ? null : buildExport(); })
+      .then(function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(state.csv).then(function () {
+            copyBtn.textContent = "Copied";
+            setTimeout(function () { copyBtn.textContent = "Copy CSV"; }, 1200);
+          }).catch(function () { showError("Could not copy. Download the CSV instead."); });
+        }
         showError("Could not copy. Download the CSV instead.");
-      }
-    } catch (e) { showError(e.message || String(e)); }
-  });
-  csvBtn.addEventListener("click", function () {
-    try {
-      if (!state.csv) buildExport();
-      downloadBlob(new Blob([state.csv], { type: "text/csv;charset=utf-8" }), "healthcsv.csv");
-    } catch (e) { showError(e.message || String(e)); }
-  });
-  jsonBtn.addEventListener("click", function () {
-    try {
-      if (!state.json) buildExport();
-      downloadBlob(new Blob([state.json], { type: "application/json;charset=utf-8" }), "healthcsv.json");
-    } catch (e) { showError(e.message || String(e)); }
-  });
+      });
+  }));
+  csvBtn.addEventListener("click", withBusy(function () {
+    return Promise.resolve()
+      .then(function () { return state.csv ? null : buildExport(); })
+      .then(function () {
+        downloadBlob(new Blob([state.csv], { type: "text/csv;charset=utf-8" }), "healthcsv.csv");
+      });
+  }));
+  jsonBtn.addEventListener("click", withBusy(function () {
+    return Promise.resolve()
+      .then(function () { return state.json ? null : buildExport(); })
+      .then(function () {
+        downloadBlob(new Blob([state.json], { type: "application/json;charset=utf-8" }), "healthcsv.json");
+      });
+  }));
   window.HealthCsv = {
     PRESETS: PRESETS,
     scanHealth: scanHealth,
@@ -703,7 +931,14 @@ footer p{margin:.4rem 0 0}
     rangeForPreset: rangeForPreset,
     wantedForPreset: wantedForPreset,
     toCsv: toCsv,
-    addDays: addDays
+    addDays: addDays,
+    makeParser: makeParser,
+    findExportXml: findExportXml,
+    sizePairMessage: sizePairMessage,
+    fmtBytes: fmtBytes,
+    WARN_BYTES: WARN_BYTES,
+    WARN_UNCOMPRESSED: WARN_UNCOMPRESSED,
+    REFUSE_ZIP_BYTES: REFUSE_ZIP_BYTES
   };
 })();
 </script>
