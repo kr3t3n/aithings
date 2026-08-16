@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>docxmd — Word to markdown</title>
-<meta name="description" content="Drop a Word .docx and copy Markdown. Runs entirely in your browser. Nothing is uploaded.">
+<title>docxmd — Word or LibreOffice to markdown</title>
+<meta name="description" content="Drop a Word .docx or LibreOffice .odt and copy Markdown. Runs entirely in your browser. Nothing is uploaded.">
 <meta name="author" content="Georgi Pepelyankov">
 <meta property="og:type" content="website">
-<meta property="og:title" content="docxmd — Word to markdown">
-<meta property="og:description" content="Drop a .docx, copy Markdown. The file never leaves the browser.">
+<meta property="og:title" content="docxmd — Word or LibreOffice to markdown">
+<meta property="og:description" content="Drop a .docx or .odt, copy Markdown. The file never leaves the browser.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Emd%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -100,13 +100,13 @@ footer p{margin:.4rem 0 0}
 <div class="page">
   <header>
     <p class="eyebrow"><a href="https://aithings.online">aithings</a> / docxmd</p>
-    <h1>Word to markdown.</h1>
-    <p class="lede">Drop a <code>.docx</code>. Copy Markdown. Old <code>.doc</code> files fail.</p>
+    <h1>Word or LibreOffice to markdown.</h1>
+    <p class="lede">Drop a Word or LibreOffice file. Copy Markdown. Old <code>.doc</code> files fail.</p>
   </header>
   <label class="drop" id="drop" tabindex="0">
-    <strong>Drop a .docx here, or click to choose</strong>
-    Word OOXML only. Nothing is uploaded.
-    <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+    <strong>Drop a .docx or .odt here, or click to choose</strong>
+    Word or LibreOffice Writer. Nothing is uploaded.
+    <input id="file" type="file" accept=".docx,.odt,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text" hidden>
   </label>
   <p class="privacy">The file never leaves the browser. There is no server and no account.</p>
   <p class="err hidden" id="err" role="alert"></p>
@@ -119,13 +119,15 @@ footer p{margin:.4rem 0 0}
     <textarea class="preview" id="preview" readonly aria-label="Markdown output"></textarea>
   </div>
   <footer>
-    <p>Caps: 50&nbsp;MB. Accepts <code>.docx</code> (ZIP + <code>word/document.xml</code>).
+    <p>Caps: 50&nbsp;MB. Accepts <code>.docx</code> (ZIP + <code>word/document.xml</code>)
+      and <code>.odt</code> (ZIP + <code>content.xml</code>).
       Old <code>.doc</code>, <code>.pptx</code>, and random files fail with an error.</p>
     <p><a href="https://github.com/kr3t3n/docxmd">source</a>
       · <a href="https://aithings.online">aithings.online</a>
       · <a href="https://x.com/georgipep">Georgi</a></p>
   </footer>
 </div>
+<script src="./vendor/jszip.js"></script>
 <script src="./vendor/mammoth.browser.min.js"></script>
 <script>
 (function () {
@@ -180,7 +182,7 @@ footer p{margin:.4rem 0 0}
       .replace(/\s+/g, " ")
       .trim()
       .replace(/^\.+/, "")
-      .replace(/\.docx$/i, "")
+      .replace(/\.(docx|odt)$/i, "")
       .slice(0, 80);
     return (s || "document") + ".md";
   }
@@ -231,19 +233,219 @@ footer p{margin:.4rem 0 0}
     var u = new Uint8Array(buf);
     var lower = String(name || "").toLowerCase();
     if (looksOle(u) || (lower.endsWith(".doc") && !lower.endsWith(".docx"))) {
-      throw new Error("This is an old Word .doc (OLE compound), not a .docx. Save as .docx in Word and drop that.");
+      throw new Error("This is the old Word binary (.doc). Use .docx or .odt.");
     }
     if (!looksZip(u)) {
-      throw new Error("Not a .docx. Drop a Word .docx file (ZIP containing word/document.xml).");
+      throw new Error("Not a Word or LibreOffice file. Drop a .docx or .odt.");
     }
     var hasWord = asciiHas(u, "word/document.xml");
     var hasPpt = asciiHas(u, "ppt/presentation.xml");
-    if (hasPpt && !hasWord) {
-      throw new Error("This is a PowerPoint .pptx, not a Word .docx.");
+    var hasOdt = asciiHas(u, "application/vnd.oasis.opendocument.text");
+    var hasOds = asciiHas(u, "application/vnd.oasis.opendocument.spreadsheet");
+    var hasContent = asciiHas(u, "content.xml");
+    if (hasPpt && !hasWord && !hasOdt) {
+      throw new Error("This is a PowerPoint .pptx, not a Word or LibreOffice file.");
     }
-    if (!hasWord) {
-      throw new Error("Not a .docx: ZIP is missing word/document.xml.");
+    if (hasWord) return "docx";
+    if (hasOdt || (lower.endsWith(".odt") && hasContent)) return "odt";
+    if (hasOds) {
+      throw new Error("This is a spreadsheet .ods, not a Writer .odt. Use .docx or .odt.");
     }
+    throw new Error("Not a .docx or .odt. ZIP is missing word/document.xml and Writer content.xml.");
+  }
+  function localName(el) {
+    if (!el) return "";
+    if (el.localName) return el.localName;
+    var n = String(el.nodeName || "");
+    var i = n.indexOf(":");
+    return i >= 0 ? n.slice(i + 1) : n;
+  }
+  function attr(el, name) {
+    if (!el || !el.attributes) return "";
+    if (el.getAttribute) {
+      var direct = el.getAttribute(name);
+      if (direct != null && direct !== "") return direct;
+    }
+    var i, a = el.attributes, nm;
+    for (i = 0; i < a.length; i++) {
+      nm = a[i].localName || a[i].name || "";
+      if (nm === name || nm.slice(nm.length - name.length - 1) === ":" + name) {
+        return a[i].value || "";
+      }
+    }
+    return "";
+  }
+  function kids(el) {
+    var out = [], i, n;
+    if (!el || !el.childNodes) return out;
+    n = el.childNodes;
+    for (i = 0; i < n.length; i++) if (n[i].nodeType === 1) out.push(n[i]);
+    return out;
+  }
+  function collectStyles(doc) {
+    var map = {};
+    var nodes = doc.getElementsByTagName("*");
+    var i, j, el, name, props, w, s, bold, italic;
+    for (i = 0; i < nodes.length; i++) {
+      el = nodes[i];
+      if (localName(el) !== "style") continue;
+      name = attr(el, "name");
+      if (!name) continue;
+      bold = false;
+      italic = false;
+      props = el.getElementsByTagName("*");
+      for (j = 0; j < props.length; j++) {
+        if (localName(props[j]) !== "text-properties") continue;
+        w = attr(props[j], "font-weight");
+        s = attr(props[j], "font-style");
+        if (w === "bold" || parseInt(w, 10) >= 600) bold = true;
+        if (s === "italic" || s === "oblique") italic = true;
+      }
+      map[name] = { bold: bold, italic: italic };
+    }
+    return map;
+  }
+  function wrapMark(text, bold, italic) {
+    if (!text) return "";
+    if (bold && italic) return "***" + text + "***";
+    if (bold) return "**" + text + "**";
+    if (italic) return "*" + text + "*";
+    return text;
+  }
+  function inlineText(el, styles) {
+    var out = "";
+    function walk(node, bold, italic) {
+      var name, st, b, it, c, n, i, count;
+      if (!node) return;
+      if (node.nodeType === 3) {
+        out += wrapMark(node.nodeValue || "", bold, italic);
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      name = localName(node);
+      if (name === "s") {
+        count = parseInt(attr(node, "c") || "1", 10);
+        if (!(count > 0)) count = 1;
+        out += new Array(count + 1).join(" ");
+        return;
+      }
+      if (name === "tab") { out += " "; return; }
+      if (name === "line-break") { out += "  \n"; return; }
+      if (name === "soft-page-break") return;
+      if (name === "image" || name === "object") {
+        out += "![image]";
+        return;
+      }
+      if (name === "frame") {
+        b = false;
+        n = node.getElementsByTagName("*");
+        for (i = 0; i < n.length; i++) {
+          if (localName(n[i]) === "image") { b = true; break; }
+        }
+        if (b) { out += "![image]"; return; }
+      }
+      b = bold;
+      it = italic;
+      if (name === "span") {
+        st = styles[attr(node, "style-name")] || {};
+        b = b || !!st.bold;
+        it = it || !!st.italic;
+      }
+      c = node.childNodes;
+      for (i = 0; i < c.length; i++) walk(c[i], b, it);
+    }
+    walk(el, false, false);
+    return out.replace(/[ \t]+\n/g, "\n").replace(/[ \t]{2,}/g, " ").trim();
+  }
+  function emitList(listEl, styles, out, depth) {
+    var items = kids(listEl);
+    var indent = new Array(depth + 1).join("  ");
+    var i, j, parts, first, n, t;
+    for (i = 0; i < items.length; i++) {
+      if (localName(items[i]) !== "list-item") continue;
+      parts = kids(items[i]);
+      first = true;
+      for (j = 0; j < parts.length; j++) {
+        n = localName(parts[j]);
+        if (n === "p" || n === "h") {
+          t = inlineText(parts[j], styles);
+          if (first) {
+            out.push(indent + "- " + t);
+            first = false;
+          } else if (t) {
+            out.push(indent + "  " + t);
+          }
+        } else if (n === "list") {
+          if (first) { out.push(indent + "-"); first = false; }
+          emitList(parts[j], styles, out, depth + 1);
+        }
+      }
+      if (first) out.push(indent + "-");
+    }
+  }
+  function emitBlocks(el, styles, out) {
+    var name = localName(el);
+    var t, level, hashes, i, ch;
+    if (name === "annotation" || name === "tracked-changes") return;
+    if (name === "h") {
+      level = parseInt(attr(el, "outline-level") || "1", 10);
+      if (!(level >= 1)) level = 1;
+      if (level > 6) level = 6;
+      hashes = "######".slice(0, level);
+      t = inlineText(el, styles);
+      if (t) { out.push(hashes + " " + t); out.push(""); }
+      return;
+    }
+    if (name === "p") {
+      t = inlineText(el, styles);
+      if (t) { out.push(t); out.push(""); }
+      return;
+    }
+    if (name === "list") {
+      emitList(el, styles, out, 0);
+      out.push("");
+      return;
+    }
+    ch = kids(el);
+    for (i = 0; i < ch.length; i++) emitBlocks(ch[i], styles, out);
+  }
+  function findOfficeText(doc) {
+    var nodes = doc.getElementsByTagName("*");
+    var i;
+    for (i = 0; i < nodes.length; i++) {
+      if (localName(nodes[i]) === "text" && localName(nodes[i].parentNode) === "body") {
+        return nodes[i];
+      }
+    }
+    for (i = 0; i < nodes.length; i++) {
+      if (localName(nodes[i]) === "text") return nodes[i];
+    }
+    return doc.documentElement;
+  }
+  async function odtToMarkdown(buf) {
+    var zip = await JSZip.loadAsync(buf);
+    var file = zip.file("content.xml") || zip.file("Content.xml");
+    if (!file) {
+      var names = Object.keys(zip.files || {});
+      var i;
+      for (i = 0; i < names.length; i++) {
+        if (names[i].replace(/^.*\//, "").toLowerCase() === "content.xml" && !zip.files[names[i]].dir) {
+          file = zip.file(names[i]);
+          break;
+        }
+      }
+    }
+    if (!file) throw new Error("Not an .odt: ZIP is missing content.xml.");
+    var xml = await file.async("string");
+    var doc = new DOMParser().parseFromString(xml, "text/xml");
+    var err = doc.getElementsByTagName("parsererror")[0];
+    if (err) throw new Error("The .odt content.xml could not be parsed.");
+    var styles = collectStyles(doc);
+    var body = findOfficeText(doc);
+    var lines = [];
+    emitBlocks(body, styles, lines);
+    var md = lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+|\n+$/g, "");
+    return tightenBulletLists(md);
   }
   function render(md, name) {
     markdown = md;
@@ -269,19 +471,24 @@ footer p{margin:.4rem 0 0}
     }
     try {
       var buf = await file.arrayBuffer();
-      classify(buf, file.name);
-      var result = await mammoth.convertToMarkdown(
-        { arrayBuffer: buf },
-        {
-          convertImage: mammoth.images.imgElement(function (image) {
-            return image.altText.then(function (alt) {
-              return { src: "", alt: alt || "image" };
-            });
-          })
-        }
-      );
-      var md = (result && result.value) ? String(result.value) : "";
-      md = cleanMarkdown(md);
+      var kind = classify(buf, file.name);
+      var md = "";
+      if (kind === "odt") {
+        md = await odtToMarkdown(buf);
+      } else {
+        var result = await mammoth.convertToMarkdown(
+          { arrayBuffer: buf },
+          {
+            convertImage: mammoth.images.imgElement(function (image) {
+              return image.altText.then(function (alt) {
+                return { src: "", alt: alt || "image" };
+              });
+            })
+          }
+        );
+        md = (result && result.value) ? String(result.value) : "";
+        md = cleanMarkdown(md);
+      }
       if (!md.replace(/\s+/g, "")) {
         throw new Error("The document converted to empty Markdown.");
       }
