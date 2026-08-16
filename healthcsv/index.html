@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>healthcsv — Apple Health to CSV</title>
+<meta name="description" content="Drop an Apple Health export.xml or zip, pick metric types and a date range, get a compact CSV or JSON. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="healthcsv — Apple Health to CSV">
+<meta property="og:description" content="Filter an Apple Health export, then export only the types and dates you pick. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2710%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Ecsv%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --warn:#8a5a00;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+    --warn:#e6c07b;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,a:focus-visible,.drop:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.warn{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--warn);
+  color:var(--warn);background:var(--panel);
+}
+.panel{
+  margin:1.2rem 0 0;padding:.9rem .95rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);
+}
+.meta{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin:0 0 .7rem}
+.dates{display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:end;margin:0 0 .85rem}
+.dates label{display:flex;flex-direction:column;gap:.2rem;font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+.dates input{color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:.3rem .45rem}
+.types{
+  max-height:18rem;overflow:auto;margin:0;padding:0;list-style:none;
+  border-top:1px solid var(--rule);
+}
+.types li{display:grid;grid-template-columns:auto 1fr auto;gap:.45rem .6rem;align-items:center;padding:.45rem .1rem;border-bottom:1px solid var(--rule)}
+.types label{font-family:var(--mono);font-size:.82rem;word-break:break-all}
+.types .n{font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+.hint{margin:.7rem 0 0;color:var(--muted);font-size:.86rem}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1rem 0 0}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / healthcsv</p>
+    <h1>Apple Health, filtered.</h1>
+    <p class="lede">Drop <code>export.xml</code> or the Health zip. Pick types and a date range.
+      Get a compact CSV or JSON — not the whole dump.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop export.xml or export.zip here, or click to choose</strong>
+    Apple Health export. Filter first, then export.
+    <input id="file" type="file" accept=".xml,.zip,application/zip,text/xml,application/xml" hidden>
+  </label>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <p class="warn hidden" id="warn" role="status"></p>
+  <div id="results" class="panel hidden">
+    <p class="meta" id="summary"></p>
+    <div class="dates">
+      <label>From <input type="date" id="from"></label>
+      <label>To <input type="date" id="to"></label>
+    </div>
+    <ul class="types" id="types"></ul>
+    <p class="hint">Nothing is selected. Tick the types you want. Common ones if present:
+      StepCount, HeartRate, BodyMass, SleepAnalysis. This will not dump the whole file.</p>
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="copy" disabled>Copy CSV</button>
+      <button type="button" id="dlcsv" disabled>Download CSV</button>
+      <button type="button" id="dljson" disabled>Download JSON</button>
+    </div>
+  </div>
+  <footer>
+    <p>Caps: warn over 80&nbsp;MB, refuse over 250&nbsp;MB. Unknown files and ZIPs without
+      <code>export.xml</code> fail with an error. Clinical / CDA / ECG files are ignored.
+      Record and Workout only.</p>
+    <p><a href="https://github.com/kr3t3n/healthcsv">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/jszip.js"></script>
+<script>
+(function () {
+  "use strict";
+  var WARN_BYTES = 80 * 1024 * 1024;
+  var REFUSE_BYTES = 250 * 1024 * 1024;
+  var TAG_RE = /<(Record|Workout)\b([^>]*)>/g;
+  var ATTR_RE = /([A-Za-z_][\w:.-]*)="([^"]*)"/g;
+  var DATE_RE = /^(\d{4}-\d{2}-\d{2})/;
+  var COLS = [
+    "kind", "type", "startDate", "endDate", "value", "unit", "sourceName",
+    "duration", "durationUnit", "totalDistance", "totalDistanceUnit",
+    "totalEnergyBurned", "totalEnergyBurnedUnit"
+  ];
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var warnEl = document.getElementById("warn");
+  var results = document.getElementById("results");
+  var summaryEl = document.getElementById("summary");
+  var typesEl = document.getElementById("types");
+  var fromEl = document.getElementById("from");
+  var toEl = document.getElementById("to");
+  var countEl = document.getElementById("count");
+  var copyBtn = document.getElementById("copy");
+  var csvBtn = document.getElementById("dlcsv");
+  var jsonBtn = document.getElementById("dljson");
+
+  var state = { xml: "", types: [], minD: "", maxD: "", n: 0 };
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function showWarn(msg) {
+    warnEl.textContent = msg;
+    warnEl.classList.remove("hidden");
+  }
+  function clearWarn() {
+    warnEl.textContent = "";
+    warnEl.classList.add("hidden");
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  }
+  function ascii(u, i, n) {
+    var s = "";
+    for (var k = 0; k < n && i + k < u.length; k++) s += String.fromCharCode(u[i + k]);
+    return s;
+  }
+  function isZip(buf) {
+    var u = new Uint8Array(buf);
+    return u.length >= 4 && u[0] === 0x50 && u[1] === 0x4B && (u[2] === 0x03 || u[2] === 0x05 || u[2] === 0x07);
+  }
+  function dateKey(s) {
+    if (!s) return "";
+    var m = String(s).match(DATE_RE);
+    return m ? m[1] : "";
+  }
+  function parseAttrs(s) {
+    var out = {};
+    ATTR_RE.lastIndex = 0;
+    var m;
+    while ((m = ATTR_RE.exec(s))) out[m[1]] = m[2];
+    return out;
+  }
+  function typeOf(kind, attrs) {
+    if (kind === "Workout") return attrs.workoutActivityType || "Workout";
+    return attrs.type || "";
+  }
+  function looksHealth(text) {
+    if (!text || text.length < 40) return false;
+    if (text.indexOf("<ClinicalDocument") !== -1 && text.indexOf("<HealthData") === -1) return false;
+    if (text.indexOf("<HealthData") !== -1) return true;
+    if (text.indexOf("HKQuantityTypeIdentifier") !== -1) return true;
+    if (text.indexOf("HKCategoryTypeIdentifier") !== -1) return true;
+    if (text.indexOf("HKWorkoutActivityType") !== -1) return true;
+    if (/<Record\b[^>]*\btype="HK/.test(text)) return true;
+    return false;
+  }
+  function looksCda(text) {
+    return text.indexOf("<ClinicalDocument") !== -1 || text.indexOf("export_cda") !== -1;
+  }
+  function addDays(ymd, days) {
+    var p = ymd.split("-");
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    d.setUTCDate(d.getUTCDate() + days);
+    var m = String(d.getUTCMonth() + 1);
+    var day = String(d.getUTCDate());
+    if (m.length < 2) m = "0" + m;
+    if (day.length < 2) day = "0" + day;
+    return d.getUTCFullYear() + "-" + m + "-" + day;
+  }
+  function defaultFrom(minD, maxD) {
+    if (!minD || !maxD) return minD || "";
+    var cut = addDays(maxD, -89);
+    return cut > minD ? cut : minD;
+  }
+  function scanHealth(xml) {
+    var types = {};
+    var minD = "", maxD = "", n = 0;
+    TAG_RE.lastIndex = 0;
+    var m;
+    while ((m = TAG_RE.exec(xml))) {
+      var kind = m[1];
+      var attrs = parseAttrs(m[2]);
+      var type = typeOf(kind, attrs);
+      if (!type) continue;
+      n++;
+      if (!types[type]) types[type] = { type: type, kind: kind, count: 0 };
+      types[type].count++;
+      var dk = dateKey(attrs.startDate || attrs.endDate);
+      if (dk) {
+        if (!minD || dk < minD) minD = dk;
+        if (!maxD || dk > maxD) maxD = dk;
+      }
+    }
+    var list = [];
+    for (var k in types) {
+      if (Object.prototype.hasOwnProperty.call(types, k)) list.push(types[k]);
+    }
+    list.sort(function (a, b) {
+      return b.count - a.count || (a.type < b.type ? -1 : a.type > b.type ? 1 : 0);
+    });
+    return { types: list, minD: minD, maxD: maxD, n: n };
+  }
+  function collectRows(xml, selected, from, to) {
+    var rows = [];
+    TAG_RE.lastIndex = 0;
+    var m;
+    while ((m = TAG_RE.exec(xml))) {
+      var kind = m[1];
+      var attrs = parseAttrs(m[2]);
+      var type = typeOf(kind, attrs);
+      if (!type || !selected[type]) continue;
+      var dk = dateKey(attrs.startDate || attrs.endDate);
+      if ((from || to) && !dk) continue;
+      if (from && dk < from) continue;
+      if (to && dk > to) continue;
+      rows.push({
+        kind: kind,
+        type: type,
+        startDate: attrs.startDate || "",
+        endDate: attrs.endDate || "",
+        value: attrs.value || "",
+        unit: attrs.unit || "",
+        sourceName: attrs.sourceName || "",
+        duration: attrs.duration || "",
+        durationUnit: attrs.durationUnit || "",
+        totalDistance: attrs.totalDistance || "",
+        totalDistanceUnit: attrs.totalDistanceUnit || "",
+        totalEnergyBurned: attrs.totalEnergyBurned || "",
+        totalEnergyBurnedUnit: attrs.totalEnergyBurnedUnit || ""
+      });
+    }
+    return rows;
+  }
+  function csvCell(s) {
+    s = s == null ? "" : String(s);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function toCsv(rows) {
+    var lines = [COLS.join(",")];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var cells = [];
+      for (var j = 0; j < COLS.length; j++) cells.push(csvCell(r[COLS[j]]));
+      lines.push(cells.join(","));
+    }
+    return lines.join("\n") + "\n";
+  }
+  function selectedTypes() {
+    var boxes = typesEl.querySelectorAll("input[type=checkbox]");
+    var sel = {};
+    var n = 0;
+    for (var i = 0; i < boxes.length; i++) {
+      if (boxes[i].checked) { sel[boxes[i].value] = 1; n++; }
+    }
+    return { map: sel, n: n };
+  }
+  function refreshButtons() {
+    var on = selectedTypes().n > 0 && !!state.xml;
+    copyBtn.disabled = !on;
+    csvBtn.disabled = !on;
+    jsonBtn.disabled = !on;
+    countEl.textContent = on ? "Export only the ticked types in range." : "Pick at least one type.";
+  }
+  function shortType(t) {
+    return t
+      .replace(/^HKQuantityTypeIdentifier/, "")
+      .replace(/^HKCategoryTypeIdentifier/, "")
+      .replace(/^HKCorrelationTypeIdentifier/, "")
+      .replace(/^HKWorkoutActivityType/, "Workout/");
+  }
+  function renderTypes(list) {
+    typesEl.textContent = "";
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      var li = document.createElement("li");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = t.type;
+      cb.id = "t" + i;
+      var lab = document.createElement("label");
+      lab.htmlFor = cb.id;
+      lab.textContent = shortType(t.type);
+      lab.title = t.type;
+      var n = document.createElement("span");
+      n.className = "n";
+      n.textContent = String(t.count);
+      li.appendChild(cb);
+      li.appendChild(lab);
+      li.appendChild(n);
+      typesEl.appendChild(li);
+    }
+  }
+  function findExportXml(zip) {
+    var names = Object.keys(zip.files);
+    var hits = [];
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var f = zip.files[name];
+      if (!f || f.dir) continue;
+      var base = name.split("/").pop();
+      if (base === "export_cda.xml") continue;
+      if (base === "export.xml") hits.push(name);
+    }
+    hits.sort(function (a, b) {
+      var ap = a.indexOf("apple_health_export/") >= 0 ? 0 : 1;
+      var bp = b.indexOf("apple_health_export/") >= 0 ? 0 : 1;
+      return ap - bp || a.length - b.length;
+    });
+    return hits[0] || null;
+  }
+  function resetUi() {
+    state = { xml: "", types: [], minD: "", maxD: "", n: 0 };
+    results.classList.add("hidden");
+    typesEl.textContent = "";
+    summaryEl.textContent = "";
+    countEl.textContent = "";
+    copyBtn.disabled = true;
+    csvBtn.disabled = true;
+    jsonBtn.disabled = true;
+    copyBtn.textContent = "Copy CSV";
+  }
+  function applyScan(xml, extraWarn) {
+    if (looksCda(xml) && !looksHealth(xml)) {
+      throw new Error("That looks like export_cda.xml. Use export.xml from the Apple Health zip.");
+    }
+    if (!looksHealth(xml)) {
+      throw new Error("Not an Apple Health export. Expected HealthData XML with Record or Workout entries.");
+    }
+    var scanned = scanHealth(xml);
+    if (!scanned.n) {
+      throw new Error("No Record or Workout entries found.");
+    }
+    state.xml = xml;
+    state.types = scanned.types;
+    state.minD = scanned.minD;
+    state.maxD = scanned.maxD;
+    state.n = scanned.n;
+    var from = defaultFrom(scanned.minD, scanned.maxD);
+    fromEl.value = from;
+    toEl.value = scanned.maxD || "";
+    fromEl.min = scanned.minD || "";
+    fromEl.max = scanned.maxD || "";
+    toEl.min = scanned.minD || "";
+    toEl.max = scanned.maxD || "";
+    renderTypes(scanned.types);
+    var range = (scanned.minD && scanned.maxD) ? (scanned.minD + " → " + scanned.maxD) : "no dates";
+    summaryEl.textContent = scanned.types.length + " types · " + scanned.n + " records · " + range +
+      ". Date inputs default to the last 90 days of the file.";
+    results.classList.remove("hidden");
+    refreshButtons();
+    if (extraWarn) showWarn(extraWarn);
+  }
+  async function xmlFromZip(buf) {
+    if (typeof JSZip === "undefined") throw new Error("ZIP support failed to load.");
+    var zip;
+    try { zip = await JSZip.loadAsync(buf); }
+    catch (e) { throw new Error("Not a ZIP, or the ZIP is damaged."); }
+    var path = findExportXml(zip);
+    if (!path) {
+      throw new Error("This ZIP has no export.xml. Apple Health zips contain apple_health_export/export.xml (CDA is ignored).");
+    }
+    var entry = zip.files[path];
+    var raw = entry._data && typeof entry._data.uncompressedSize === "number"
+      ? entry._data.uncompressedSize
+      : (typeof entry.uncompressedSize === "number" ? entry.uncompressedSize : 0);
+    if (raw > REFUSE_BYTES) {
+      throw new Error("export.xml inside this ZIP is larger than 250 MB. A file that big would freeze the tab.");
+    }
+    var xml = await entry.async("string");
+    if (xml.length > REFUSE_BYTES) {
+      throw new Error("export.xml inside this ZIP is larger than 250 MB. A file that big would freeze the tab.");
+    }
+    return { xml: xml, warnSize: raw || xml.length };
+  }
+  async function handleFile(file) {
+    if (!file) return;
+    clearError();
+    clearWarn();
+    resetUi();
+    if (file.size > REFUSE_BYTES) {
+      showError("This file is larger than 250 MB. A file that big would freeze the tab.");
+      return;
+    }
+    var sizeWarn = "";
+    if (file.size > WARN_BYTES) {
+      sizeWarn = "This file is " + fmtBytes(file.size) + ". The tab may get slow. Pick a few types and a short date range.";
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      var xml = "";
+      var innerWarn = 0;
+      if (isZip(buf)) {
+        var got = await xmlFromZip(buf);
+        xml = got.xml;
+        innerWarn = got.warnSize;
+      } else {
+        var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+        var trimmed = text.replace(/^\uFEFF/, "").replace(/^\s+/, "");
+        if (trimmed.charAt(0) !== "<") {
+          throw new Error("Not an Apple Health export. Drop export.xml or the zip that contains it.");
+        }
+        xml = text;
+      }
+      if (innerWarn > WARN_BYTES && !sizeWarn) {
+        sizeWarn = "export.xml is " + fmtBytes(innerWarn) + ". The tab may get slow. Pick a few types and a short date range.";
+      }
+      applyScan(xml, sizeWarn);
+    } catch (e) {
+      resetUi();
+      showError(e.message || String(e));
+    }
+  }
+  function currentRows() {
+    var sel = selectedTypes();
+    if (!sel.n) throw new Error("Pick at least one type.");
+    return collectRows(state.xml, sel.map, fromEl.value || "", toEl.value || "");
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  typesEl.addEventListener("change", refreshButtons);
+  fromEl.addEventListener("change", refreshButtons);
+  toEl.addEventListener("change", refreshButtons);
+  copyBtn.addEventListener("click", function () {
+    try {
+      var rows = currentRows();
+      var csv = toCsv(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(csv.length) + " (not shown).";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(csv).then(function () {
+          copyBtn.textContent = "Copied";
+          setTimeout(function () { copyBtn.textContent = "Copy CSV"; }, 1200);
+        }).catch(function () { showError("Could not copy. Download the CSV instead."); });
+      } else {
+        showError("Could not copy. Download the CSV instead.");
+      }
+    } catch (e) { showError(e.message || String(e)); }
+  });
+  csvBtn.addEventListener("click", function () {
+    try {
+      var rows = currentRows();
+      var csv = toCsv(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(csv.length) + " (not shown).";
+      downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "healthcsv.csv");
+    } catch (e) { showError(e.message || String(e)); }
+  });
+  jsonBtn.addEventListener("click", function () {
+    try {
+      var rows = currentRows();
+      var json = JSON.stringify(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(json.length) + " (not shown).";
+      downloadBlob(new Blob([json], { type: "application/json;charset=utf-8" }), "healthcsv.json");
+    } catch (e) { showError(e.message || String(e)); }
+  });
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "620f149b732d4123992eabbb9ff601da"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
