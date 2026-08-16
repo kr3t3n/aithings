@@ -11,6 +11,7 @@ open-source web tools.
 | [tgmd](https://tgmd.pages.dev) | Drop a Telegram Desktop result.json or export ZIP, get one Markdown file per chat. | [kr3t3n/tgmd](https://github.com/kr3t3n/tgmd) |
 | [igmd](https://igmd.pages.dev) | Drop a Meta Download-your-information ZIP, get one Markdown file per Instagram or Facebook chat. | [kr3t3n/igmd](https://github.com/kr3t3n/igmd) |
 | [scrub](https://scrubtxt.pages.dev) | Drop or paste a log, .env, or dump; secrets become stable placeholders. | [kr3t3n/scrub](https://github.com/kr3t3n/scrub) |
+| [nbmd](https://nbmd.pages.dev) | Drop a Jupyter .ipynb, get Markdown of code + notes. Plots stripped. | [kr3t3n/nbmd](https://github.com/kr3t3n/nbmd) |
 
 ## What this repo is
 
