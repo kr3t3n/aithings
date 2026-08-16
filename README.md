@@ -13,7 +13,7 @@ open-source web tools.
 | [scrub](https://aithings.online/scrub/) | Drop or paste a log, .env, or dump; secrets become stable placeholders. | [kr3t3n/scrub](https://github.com/kr3t3n/scrub) |
 | [nbmd](https://aithings.online/nbmd/) | Drop a Jupyter .ipynb, get Markdown of code + notes. Plots stripped. | [kr3t3n/nbmd](https://github.com/kr3t3n/nbmd) |
 | [heicjpg](https://aithings.online/heicjpg/) | Drop iPhone .heic photos, get JPEGs. | [kr3t3n/heicjpg](https://github.com/kr3t3n/heicjpg) |
-| [healthcsv](https://aithings.online/healthcsv/) | Drop an Apple Health export, pick types + dates, get a compact CSV/JSON. | [kr3t3n/healthcsv](https://github.com/kr3t3n/healthcsv) |
+| [healthcsv](https://aithings.online/healthcsv/) | Drop an Apple Health export, click a preset (or pick types + dates), get a compact CSV/JSON. | [kr3t3n/healthcsv](https://github.com/kr3t3n/healthcsv) |
 
 ## What this repo is
 
