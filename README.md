@@ -9,6 +9,7 @@ open-source web tools.
 | [makejson.online](https://makejson.online) | Turn PDFs, DOCX, spreadsheets and code into structured JSON, using your own AI API key. | [kr3t3n/makejson](https://github.com/kr3t3n/makejson) |
 | [chatmd](https://chatmd.pages.dev) | Drop a ChatGPT or Claude export ZIP, get one Markdown file per chat. | [kr3t3n/chatmd](https://github.com/kr3t3n/chatmd) |
 | [tgmd](https://tgmd.pages.dev) | Drop a Telegram Desktop result.json or export ZIP, get one Markdown file per chat. | [kr3t3n/tgmd](https://github.com/kr3t3n/tgmd) |
+| [igmd](https://igmd.pages.dev) | Drop a Meta Download-your-information ZIP, get one Markdown file per Instagram or Facebook chat. | [kr3t3n/igmd](https://github.com/kr3t3n/igmd) |
 
 ## What this repo is
 
