@@ -17,6 +17,7 @@ open-source web tools.
 | [kindlemd](https://aithings.online/kindlemd/) | Drop Kindle My Clippings.txt, get one Markdown file per book. | [kr3t3n/kindlemd](https://github.com/kr3t3n/kindlemd) |
 | [docxmd](https://aithings.online/docxmd/) | Drop a Word .docx or LibreOffice .odt, copy Markdown. | [kr3t3n/docxmd](https://github.com/kr3t3n/docxmd) |
 | [xlsxmd](https://aithings.online/xlsxmd/) | Drop an .xlsx, .csv, or .ods, copy Markdown tables. | [kr3t3n/xlsxmd](https://github.com/kr3t3n/xlsxmd) |
+| [harsan](https://aithings.online/harsan/) | Drop a .har, download a copy with cookies and Authorization stripped. | [kr3t3n/harsan](https://github.com/kr3t3n/harsan) |
 
 ## What this repo is
 
@@ -33,6 +34,7 @@ served as a folder on aithings.online:
 - `/kindlemd/`
 - `/docxmd/`
 - `/xlsxmd/`
+- `/harsan/`
 
 flatten.site and makejson.online stay on their own domains. Source of truth for
 each tool is still its own repo; this tree is the public folder host.

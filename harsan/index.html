@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>harsan — strip cookies from a HAR</title>
+<meta name="description" content="Drop a .har and download a copy with cookies, Set-Cookie, and Authorization stripped. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="harsan — strip cookies from a HAR">
+<meta property="og:description" content="Drop a HAR, download a copy with cookies and Authorization stripped. The file never leaves the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Eha%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+table{width:100%;border-collapse:collapse;margin:.4rem 0 1rem;font-size:.82rem}
+th,td{text-align:left;padding:.45rem .35rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td{font-family:var(--mono);word-break:break-all}
+td.orig{word-break:break-all;max-width:14rem}
+.empty{margin:.4rem 0 1rem;color:var(--muted);font-size:.9rem}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / harsan</p>
+    <h1>Strip cookies from a HAR.</h1>
+    <p class="lede">Drop a <code>.har</code>. Download a copy with cookies, <code>Set-Cookie</code>,
+      and <code>Authorization</code> replaced by stable placeholders.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a HAR here, or click to choose</strong>
+    .har — nothing is uploaded, fetched, or replayed.
+    <input id="file" type="file" accept=".har,application/json,application/har+json" hidden>
+  </label>
+  <p class="privacy">The file never leaves the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="dl">Download sanitized .har</button>
+    </div>
+    <div id="tablewrap"></div>
+  </div>
+  <footer>
+    <p>Caps: 50&nbsp;MB. Same value becomes the same placeholder in one run.
+      Chrome 130+ already strips Cookie, Set-Cookie, and Authorization on the default export
+      — this is for unsanitized exports. Random JSON and non-HAR files fail with an error.</p>
+    <p><a href="https://github.com/kr3t3n/harsan">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script>
+(function () {
+  "use strict";
+  var MAX = 50 * 1024 * 1024;
+  var HEADER_RULES = {
+    "cookie": { type: "Cookie", slug: "COOKIE" },
+    "set-cookie": { type: "Set-Cookie", slug: "SET_COOKIE" },
+    "authorization": { type: "Authorization", slug: "AUTHORIZATION" },
+    "proxy-authorization": { type: "Proxy-Authorization", slug: "PROXY_AUTHORIZATION" },
+    "x-csrf-token": { type: "CSRF token", slug: "CSRF" },
+    "x-xsrf-token": { type: "XSRF token", slug: "XSRF" }
+  };
+  var QUERY_NAMES = {
+    cookie: 1, cookies: 1,
+    authorization: 1, auth: 1,
+    token: 1, access_token: 1, refresh_token: 1, id_token: 1,
+    session: 1, sessionid: 1, session_id: 1, sid: 1,
+    jwt: 1,
+    csrf: 1, xsrf: 1, csrf_token: 1, xsrf_token: 1, _csrf: 1, _xsrf: 1
+  };
+
+  function isHar(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
+    if (!obj.log || typeof obj.log !== "object" || Array.isArray(obj.log)) return false;
+    var hasEntries = Array.isArray(obj.log.entries);
+    var ver = obj.log.version;
+    var hasVersion = ver != null && String(ver).length > 0;
+    return hasEntries || hasVersion;
+  }
+
+  function parseHar(text) {
+    if (text && text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    var obj;
+    try { obj = JSON.parse(text); }
+    catch (e) { throw new Error("That is not JSON. Drop a .har from the browser’s Network panel."); }
+    if (!isHar(obj)) {
+      throw new Error("Not a HAR file. A HAR is JSON with log.entries or a HAR version.");
+    }
+    return obj;
+  }
+
+  function replaceQueryInUrl(url, name, oldVal, newVal) {
+    if (!url || oldVal == null) return url;
+    var raw = name + "=" + oldVal;
+    if (url.indexOf(raw) >= 0) return url.split(raw).join(name + "=" + newVal);
+    var enc = encodeURIComponent(name) + "=" + encodeURIComponent(oldVal);
+    if (enc !== raw && url.indexOf(enc) >= 0) {
+      return url.split(enc).join(encodeURIComponent(name) + "=" + encodeURIComponent(newVal));
+    }
+    return url;
+  }
+
+  function sanitize(har) {
+    var out = JSON.parse(JSON.stringify(har));
+    var byValue = Object.create(null);
+    var counters = Object.create(null);
+    var findings = [];
+
+    function placeholder(type, slug, value) {
+      var s = String(value);
+      var ph = byValue[s];
+      if (!ph) {
+        counters[slug] = (counters[slug] || 0) + 1;
+        ph = "[" + slug + "_" + counters[slug] + "]";
+        byValue[s] = ph;
+        findings.push({ type: type, original: s, placeholder: ph, count: 0 });
+      }
+      for (var i = 0; i < findings.length; i++) {
+        if (findings[i].placeholder === ph) { findings[i].count++; break; }
+      }
+      return ph;
+    }
+
+    function scrubHeaders(headers) {
+      if (!Array.isArray(headers)) return;
+      for (var i = 0; i < headers.length; i++) {
+        var h = headers[i];
+        if (!h || h.name == null || h.value == null) continue;
+        var rule = HEADER_RULES[String(h.name).toLowerCase()];
+        if (!rule) continue;
+        if (String(h.value) === "") continue;
+        h.value = placeholder(rule.type, rule.slug, h.value);
+      }
+    }
+
+    function scrubCookies(cookies) {
+      if (!Array.isArray(cookies)) return;
+      for (var i = 0; i < cookies.length; i++) {
+        var c = cookies[i];
+        if (!c || c.value == null || String(c.value) === "") continue;
+        c.value = placeholder("Cookie", "COOKIE", c.value);
+      }
+    }
+
+    function scrubQuery(qs, holder) {
+      if (!Array.isArray(qs)) return;
+      for (var i = 0; i < qs.length; i++) {
+        var q = qs[i];
+        if (!q || q.name == null || q.value == null) continue;
+        if (!QUERY_NAMES[String(q.name).toLowerCase()]) continue;
+        if (String(q.value) === "") continue;
+        var old = String(q.value);
+        var ph = placeholder("Query", "QUERY", old);
+        q.value = ph;
+        if (holder && holder.url) holder.url = replaceQueryInUrl(holder.url, String(q.name), old, ph);
+      }
+    }
+
+    var entries = (out.log && Array.isArray(out.log.entries)) ? out.log.entries : [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e) continue;
+      if (e.request) {
+        scrubHeaders(e.request.headers);
+        scrubCookies(e.request.cookies);
+        scrubQuery(e.request.queryString, e.request);
+      }
+      if (e.response) {
+        scrubHeaders(e.response.headers);
+        scrubCookies(e.response.cookies);
+      }
+    }
+    return { har: out, findings: findings };
+  }
+
+  function trunc(s, n) {
+    n = n || 64;
+    if (s.length <= n) return s;
+    return s.slice(0, n - 10) + "…" + s.slice(-8);
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function looksBinary(buf) {
+    var n = Math.min(buf.byteLength, 8192);
+    var u = new Uint8Array(buf, 0, n);
+    var bad = 0;
+    for (var i = 0; i < n; i++) {
+      if (u[i] === 0) return true;
+      if (u[i] < 7 || (u[i] > 13 && u[i] < 32 && u[i] !== 9)) bad++;
+    }
+    return n > 0 && bad / n > 0.15;
+  }
+  function sanitiseStem(name) {
+    var s = String(name || "capture")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .replace(/\.(har|json)$/i, "")
+      .slice(0, 80);
+    return s || "capture";
+  }
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var countEl = document.getElementById("count");
+  var tablewrap = document.getElementById("tablewrap");
+  var dlBtn = document.getElementById("dl");
+  var lastName = "sanitized.har";
+  var cleanText = "";
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    cleanText = "";
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function render(har) {
+    var r = sanitize(har);
+    cleanText = JSON.stringify(r.har, null, 2);
+    var n = r.findings.length;
+    var hits = 0;
+    for (var i = 0; i < r.findings.length; i++) hits += r.findings[i].count;
+    countEl.textContent = n
+      ? (n + (n === 1 ? " secret" : " secrets") + " · " + hits + (hits === 1 ? " hit" : " hits"))
+      : "Nothing stripped";
+    if (!n) {
+      tablewrap.innerHTML = "<p class=\"empty\">No cookies, Set-Cookie, Authorization, or obvious session query params. The download is an unchanged copy.</p>";
+    } else {
+      var html = "<table><thead><tr><th>Type</th><th>Original</th><th>Placeholder</th><th>Count</th></tr></thead><tbody>";
+      for (var j = 0; j < r.findings.length; j++) {
+        var f = r.findings[j];
+        html += "<tr><td>" + esc(f.type) + "</td><td class=\"orig\" title=\"" + esc(f.original) + "\">" + esc(trunc(f.original)) + "</td><td>" + esc(f.placeholder) + "</td><td>" + f.count + "</td></tr>";
+      }
+      html += "</tbody></table>";
+      tablewrap.innerHTML = html;
+    }
+    results.classList.remove("hidden");
+  }
+
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("File is larger than 50 MB. The file never leaves the browser, and a HAR that big will freeze this tab.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      if (looksBinary(buf)) {
+        showError("That looks like a binary file. Drop a .har from the browser’s Network panel.");
+        return;
+      }
+      var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+      var har = parseHar(text);
+      lastName = sanitiseStem(file.name) + ".sanitized.har";
+      render(har);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  dlBtn.addEventListener("click", function () {
+    if (!cleanText) return;
+    var blob = new Blob([cleanText], { type: "application/json;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = lastName;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  window.Harsan = { sanitize: sanitize, isHar: isHar, parseHar: parseHar };
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bb175ce74d2f454fab7e3c56ef2b44ea"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
