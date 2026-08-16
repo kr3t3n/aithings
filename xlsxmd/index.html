@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xlsxmd — spreadsheet to markdown</title>
+<meta name="description" content="Drop an .xlsx, .csv, or .ods and copy Markdown tables. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="xlsxmd — spreadsheet to markdown">
+<meta property="og:description" content="Drop a spreadsheet, copy Markdown tables. The file never leaves the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Emd%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible,.item:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.item{border-bottom:1px solid var(--rule)}
+.row{
+  display:grid;grid-template-columns:1fr auto;gap:.35rem .7rem;
+  padding:.85rem 0;align-items:baseline;cursor:pointer;
+}
+.name{font-family:var(--mono);font-size:.95rem;font-weight:600}
+.meta{grid-column:1/-1;margin:0;color:var(--muted);font-size:.82rem;font-family:var(--mono)}
+.actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.preview{
+  display:block;margin:0 0 .85rem;width:100%;min-height:12rem;max-height:28rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.preview.hidden{display:none}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / xlsxmd</p>
+    <h1>Spreadsheet to markdown.</h1>
+    <p class="lede">Drop an <code>.xlsx</code>, <code>.csv</code>, or <code>.ods</code>.
+      Copy a Markdown table. Formulas show the cached value Excel last saved.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a spreadsheet here, or click to choose</strong>
+    .xlsx, .csv, or .ods. Nothing is uploaded.
+    <input id="file" type="file" accept=".xlsx,.csv,.ods,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/vnd.oasis.opendocument.spreadsheet" hidden>
+  </label>
+  <p class="privacy">The file never leaves the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+  <footer>
+    <p>Caps: 15&nbsp;MB. SheetJS loads the whole workbook in this tab, so bigger files freeze the page.
+      Old <code>.xls</code>, random files, and empty books fail with an error.</p>
+    <p><a href="https://github.com/kr3t3n/xlsxmd">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/xlsx.full.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX = 15 * 1024 * 1024;
+  var OLE = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var listEl = document.getElementById("list");
+  var countEl = document.getElementById("count");
+  var sheets = [];
+  var baseName = "sheet";
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    sheets = [];
+    listEl.innerHTML = "";
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function looksOle(u) {
+    if (u.length < 8) return false;
+    for (var i = 0; i < 8; i++) if (u[i] !== OLE[i]) return false;
+    return true;
+  }
+  function looksZip(u) {
+    return u.length >= 4 && u[0] === 0x50 && u[1] === 0x4B &&
+      (u[2] === 0x03 || u[2] === 0x05 || u[2] === 0x07) &&
+      (u[3] === 0x04 || u[3] === 0x06 || u[3] === 0x08);
+  }
+  function asciiHas(u, s) {
+    var n = s.length;
+    if (u.length < n) return false;
+    outer: for (var i = 0; i <= u.length - n; i++) {
+      for (var j = 0; j < n; j++) {
+        if (u[i + j] !== s.charCodeAt(j)) continue outer;
+      }
+      return true;
+    }
+    return false;
+  }
+  function looksText(u) {
+    if (!u.length) return false;
+    var n = Math.min(u.length, 4096);
+    var weird = 0;
+    for (var i = 0; i < n; i++) {
+      var b = u[i];
+      if (b === 0) return false;
+      if (b < 9 || (b > 13 && b < 32)) weird++;
+    }
+    return (weird / n) < 0.02;
+  }
+  function looksCsv(u) {
+    if (!looksText(u)) return false;
+    var n = Math.min(u.length, 8192);
+    var commas = 0, tabs = 0, semis = 0, lines = 0;
+    for (var i = 0; i < n; i++) {
+      if (u[i] === 0x2C) commas++;
+      else if (u[i] === 0x09) tabs++;
+      else if (u[i] === 0x3B) semis++;
+      else if (u[i] === 0x0A) lines++;
+    }
+    return commas + tabs + semis > 0;
+  }
+  function classify(buf, name) {
+    var u = new Uint8Array(buf);
+    var lower = String(name || "").toLowerCase();
+    if (looksOle(u) || (/\.xls$/i.test(lower) && !/\.xlsx$/i.test(lower))) {
+      throw new Error("This is an old Excel .xls (OLE compound), not a .xlsx. Save as .xlsx in Excel and drop that.");
+    }
+    if (looksZip(u)) {
+      var hasXl = asciiHas(u, "xl/workbook.xml") || asciiHas(u, "xl/workbook.bin");
+      var hasOds = asciiHas(u, "application/vnd.oasis.opendocument.spreadsheet");
+      var hasWord = asciiHas(u, "word/document.xml");
+      var hasPpt = asciiHas(u, "ppt/presentation.xml");
+      if (hasXl) return "xlsx";
+      if (hasOds) return "ods";
+      if (hasPpt && !hasWord) throw new Error("This is a PowerPoint .pptx, not a spreadsheet.");
+      if (hasWord) throw new Error("This is a Word .docx, not a spreadsheet.");
+      throw new Error("Not a spreadsheet ZIP. Drop an .xlsx, .ods, or .csv.");
+    }
+    if (/\.csv$/i.test(lower) || looksCsv(u)) return "csv";
+    throw new Error("Not a spreadsheet. Drop an .xlsx, .ods, or .csv. Old .xls and random files fail.");
+  }
+  function sanitiseStem(name) {
+    var s = String(name || "sheet")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .replace(/\.(xlsx|xlsm|xlsb|xls|ods|csv)$/i, "")
+      .slice(0, 80);
+    return s || "sheet";
+  }
+  function sanitisePart(name) {
+    var s = String(name || "sheet")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .slice(0, 60);
+    return s || "sheet";
+  }
+  function escapeCell(v) {
+    return String(v == null ? "" : v)
+      .replace(/\r\n|\r|\n/g, " ")
+      .replace(/\|/g, "\\|");
+  }
+  function rowWidth(rows) {
+    var w = 0, i;
+    for (i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].length > w) w = rows[i].length;
+    }
+    return w;
+  }
+  function cellAt(row, i) {
+    if (!row || i >= row.length || row[i] == null) return "";
+    return row[i];
+  }
+  function isBlankRow(row) {
+    if (!row || !row.length) return true;
+    var i;
+    for (i = 0; i < row.length; i++) {
+      if (String(row[i] == null ? "" : row[i]).trim() !== "") return false;
+    }
+    return true;
+  }
+  function trimGrid(rows) {
+    var out = rows.slice();
+    while (out.length && isBlankRow(out[out.length - 1])) out.pop();
+    while (out.length && isBlankRow(out[0])) out.shift();
+    return out;
+  }
+  function toMarkdown(rows) {
+    var grid = trimGrid(rows);
+    var w = rowWidth(grid);
+    if (!grid.length || !w) return "";
+    var i, j, cells, lines = [];
+    function line(row) {
+      cells = [];
+      for (j = 0; j < w; j++) cells.push(escapeCell(cellAt(row, j)));
+      return "| " + cells.join(" | ") + " |";
+    }
+    lines.push(line(grid[0]));
+    cells = [];
+    for (j = 0; j < w; j++) cells.push("---");
+    lines.push("| " + cells.join(" | ") + " |");
+    for (i = 1; i < grid.length; i++) lines.push(line(grid[i]));
+    return lines.join("\n");
+  }
+  function toCsv(rows) {
+    var grid = trimGrid(rows);
+    var w = rowWidth(grid);
+    if (!grid.length || !w) return "";
+    var i, j, cells, lines = [];
+    function esc(v) {
+      var s = String(v == null ? "" : v);
+      if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    for (i = 0; i < grid.length; i++) {
+      cells = [];
+      for (j = 0; j < w; j++) cells.push(esc(cellAt(grid[i], j)));
+      lines.push(cells.join(","));
+    }
+    return lines.join("\n");
+  }
+  function parseBook(buf, kind) {
+    var opts = { type: "array", cellDates: true };
+    if (kind === "csv") opts.type = "array";
+    var wb;
+    try {
+      wb = XLSX.read(buf, opts);
+    } catch (e) {
+      throw new Error("Could not read this spreadsheet. " + (e.message || String(e)));
+    }
+    if (!wb || !wb.SheetNames || !wb.SheetNames.length) {
+      throw new Error("This workbook is empty — no sheets.");
+    }
+    var out = [];
+    var i, name, ws, rows, md;
+    for (i = 0; i < wb.SheetNames.length; i++) {
+      name = wb.SheetNames[i];
+      ws = wb.Sheets[name];
+      rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+      rows = trimGrid(rows);
+      md = toMarkdown(rows);
+      out.push({
+        name: name,
+        rows: rows,
+        markdown: md,
+        csv: toCsv(rows),
+        width: rowWidth(rows),
+        height: rows.length
+      });
+    }
+    var useful = out.filter(function (s) { return s.markdown; });
+    if (!useful.length) {
+      throw new Error("This workbook is empty — no cells on any sheet.");
+    }
+    return useful;
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function fileName(sheet, ext) {
+    var stem = sanitiseStem(baseName);
+    if (sheets.length > 1) stem = stem + "-" + sanitisePart(sheet.name);
+    return stem + ext;
+  }
+  function hidePreviews(except) {
+    listEl.querySelectorAll(".preview").forEach(function (el) {
+      if (el !== except) el.classList.add("hidden");
+    });
+  }
+  function openPreview(i, select) {
+    var box = listEl.querySelector('.preview[data-i="' + i + '"]');
+    if (!box) return;
+    hidePreviews(box);
+    box.value = sheets[i].markdown;
+    box.classList.remove("hidden");
+    if (select) {
+      box.focus();
+      box.select();
+    }
+  }
+  function render() {
+    listEl.innerHTML = "";
+    var multi = sheets.length > 1;
+    countEl.textContent = multi
+      ? sheets.length + " sheets"
+      : sheets[0].height + (sheets[0].height === 1 ? " row" : " rows") +
+        " · " + sheets[0].width + (sheets[0].width === 1 ? " col" : " cols") +
+        " · " + fileName(sheets[0], ".md");
+    sheets.forEach(function (sheet, i) {
+      var li = document.createElement("li");
+      li.className = "item";
+      var row = document.createElement("div");
+      row.className = "row";
+      row.tabIndex = 0;
+      row.setAttribute("data-i", String(i));
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = multi ? sheet.name : fileName(sheet, ".md");
+      var actions = document.createElement("span");
+      actions.className = "actions";
+      [["copy", "Copy"], ["md", "Download .md"], ["csv", "Download .csv"]].forEach(function (pair) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("data-act", pair[0]);
+        btn.setAttribute("data-i", String(i));
+        btn.textContent = pair[1];
+        actions.appendChild(btn);
+      });
+      var meta = document.createElement("p");
+      meta.className = "meta";
+      meta.textContent = (multi ? sheet.name + " · " : "") +
+        sheet.height + (sheet.height === 1 ? " row" : " rows") + " · " +
+        sheet.width + (sheet.width === 1 ? " col" : " cols");
+      row.appendChild(name);
+      row.appendChild(actions);
+      row.appendChild(meta);
+      var preview = document.createElement("textarea");
+      preview.className = "preview hidden";
+      preview.readOnly = true;
+      preview.setAttribute("data-i", String(i));
+      preview.setAttribute("aria-label", "Markdown preview");
+      li.appendChild(row);
+      li.appendChild(preview);
+      listEl.appendChild(li);
+    });
+    results.classList.remove("hidden");
+    openPreview(0, false);
+  }
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("This file is larger than 15 MB. SheetJS loads the whole workbook in this tab, so bigger files freeze the page. Save a smaller copy and drop that.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      var kind = classify(buf, file.name);
+      baseName = sanitiseStem(file.name);
+      sheets = parseBook(buf, kind);
+      render();
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  listEl.addEventListener("click", async function (e) {
+    var btn = e.target.closest("button");
+    if (btn) {
+      var i = Number(btn.getAttribute("data-i"));
+      var act = btn.getAttribute("data-act");
+      var sheet = sheets[i];
+      if (!sheet) return;
+      if (act === "copy") {
+        openPreview(i, false);
+        try {
+          await navigator.clipboard.writeText(sheet.markdown);
+          btn.textContent = "Copied";
+          setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+        } catch (err) {
+          openPreview(i, true);
+        }
+      } else if (act === "md") {
+        downloadBlob(new Blob([sheet.markdown], { type: "text/markdown;charset=utf-8" }), fileName(sheet, ".md"));
+      } else if (act === "csv") {
+        downloadBlob(new Blob([sheet.csv], { type: "text/csv;charset=utf-8" }), fileName(sheet, ".csv"));
+      }
+      return;
+    }
+    var row = e.target.closest(".row");
+    if (!row) return;
+    var idx = Number(row.getAttribute("data-i"));
+    var box = listEl.querySelector('.preview[data-i="' + idx + '"]');
+    if (box && !box.classList.contains("hidden")) {
+      box.classList.add("hidden");
+      return;
+    }
+    openPreview(idx, false);
+  });
+  listEl.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var row = e.target.closest(".row");
+    if (!row || e.target.closest("button")) return;
+    e.preventDefault();
+    row.click();
+  });
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "bb175ce74d2f454fab7e3c56ef2b44ea"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
