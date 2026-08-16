@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>heicjpg — HEIC to JPEG</title>
+<meta name="description" content="Drop iPhone .heic photos and download JPEGs. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="heicjpg — HEIC to JPEG">
+<meta property="og:description" content="Drop iPhone .heic photos, get JPEGs. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2711%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Ejpg%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,a:focus-visible,.drop:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.qual{
+  margin:1rem 0 0;padding:.85rem .95rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);display:flex;flex-wrap:wrap;gap:.55rem 1rem;align-items:center;
+}
+.qual label{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.qual input[type=range]{flex:1;min-width:10rem}
+.qual output{font-family:var(--mono);font-size:.8rem;color:var(--ink);min-width:3.2rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.row{
+  display:grid;grid-template-columns:1fr auto;gap:.35rem .8rem;align-items:center;
+  padding:.85rem .15rem;border-bottom:1px solid var(--rule);
+}
+.row .name{font-family:var(--mono);font-size:.86rem;word-break:break-all}
+.row .meta{grid-column:1/-1;font-size:.82rem;color:var(--muted)}
+.row.fail .name,.row.fail .meta{color:var(--danger)}
+.thumb{width:3.2rem;height:3.2rem;object-fit:cover;border-radius:4px;background:var(--rule);grid-row:1/span 2}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / heicjpg</p>
+    <h1>HEIC to JPEG.</h1>
+    <p class="lede">Drop iPhone <code>.heic</code> photos. Download JPEGs. Nothing is uploaded.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop .heic files here, or click to choose</strong>
+    iPhone photos. Multi-file OK.
+    <input id="file" type="file" accept=".heic,.heif,image/heic,image/heif,image/heic-sequence" multiple hidden>
+  </label>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <div class="qual">
+    <label for="quality">JPEG quality</label>
+    <input id="quality" type="range" min="0.60" max="0.95" step="0.01" value="0.85">
+    <output id="qout" for="quality">0.85</output>
+  </div>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="zip" class="hidden">Download zip</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+  <footer>
+    <p>Caps: 50&nbsp;MB per file, 20 files, 200&nbsp;MB total. Not-a-HEIC files fail with an error.
+      Some odd iOS 18 HEICs may fail in the browser decoder.</p>
+    <p><a href="https://github.com/kr3t3n/heicjpg">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/libheif-bundle.js"></script>
+<script src="./vendor/jszip.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX_FILE = 50 * 1024 * 1024;
+  var MAX_TOTAL = 200 * 1024 * 1024;
+  var MAX_FILES = 20;
+  var HEIF_BRANDS = {
+    heic: 1, heix: 1, hevc: 1, hevx: 1,
+    heim: 1, heis: 1, hevm: 1, hevs: 1,
+    mif1: 1, msf1: 1
+  };
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var countEl = document.getElementById("count");
+  var listEl = document.getElementById("list");
+  var zipBtn = document.getElementById("zip");
+  var qEl = document.getElementById("quality");
+  var qOut = document.getElementById("qout");
+  var done = [];
+
+  function quality() {
+    var n = parseFloat(qEl.value);
+    if (isNaN(n)) return 0.85;
+    return Math.min(0.95, Math.max(0.6, n));
+  }
+  qEl.addEventListener("input", function () {
+    qOut.textContent = quality().toFixed(2);
+  });
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function ascii(u, i, n) {
+    var s = "";
+    for (var k = 0; k < n; k++) s += String.fromCharCode(u[i + k]);
+    return s;
+  }
+  function looksHeic(buf, name) {
+    var u = new Uint8Array(buf);
+    if (u.length < 16) return { ok: false, reason: "File is too small to be a HEIC photo." };
+    if (u[0] === 0xFF && u[1] === 0xD8) return { ok: false, reason: "That is a JPEG, not a HEIC." };
+    if (u[0] === 0x89 && ascii(u, 1, 3) === "PNG") return { ok: false, reason: "That is a PNG, not a HEIC." };
+    if (ascii(u, 0, 4) === "RIFF" && ascii(u, 8, 4) === "WEBP") return { ok: false, reason: "That is a WebP, not a HEIC." };
+    if (ascii(u, 0, 3) === "GIF") return { ok: false, reason: "That is a GIF, not a HEIC." };
+    if (ascii(u, 0, 2) === "PK") return { ok: false, reason: "That is a ZIP, not a HEIC." };
+    if (ascii(u, 4, 4) !== "ftyp") {
+      return { ok: false, reason: "Not a HEIC/HEIF file (missing ftyp)." };
+    }
+    var brands = [];
+    for (var i = 8; i + 4 <= Math.min(u.length, 64); i += 4) brands.push(ascii(u, i, 4));
+    var hasAvif = false, hasHeif = false;
+    for (var j = 0; j < brands.length; j++) {
+      var b = brands[j].replace(/[ \0]/g, "");
+      if (b === "avif" || b === "avis") hasAvif = true;
+      if (HEIF_BRANDS[b]) hasHeif = true;
+    }
+    if (hasAvif && !hasHeif) return { ok: false, reason: "That is an AVIF, not a HEIC." };
+    if (!hasHeif) return { ok: false, reason: "Not a HEIC/HEIF file." };
+    return { ok: true };
+  }
+  function jpgName(name) {
+    var base = (name || "photo").replace(/\.[^.]+$/, "");
+    return (base || "photo") + ".jpg";
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+  function decoderReady() {
+    return typeof libheif !== "undefined" && libheif && typeof libheif.HeifDecoder === "function";
+  }
+  function decodeToJpeg(buf, q) {
+    if (!decoderReady()) return Promise.reject(new Error("HEIC decoder failed to load."));
+    var decoder = new libheif.HeifDecoder();
+    var images;
+    try { images = decoder.decode(new Uint8Array(buf)); }
+    catch (e) { return Promise.reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder.")); }
+    if (!images || !images.length) {
+      return Promise.reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."));
+    }
+    var image = images[0];
+    var width = image.get_width();
+    var height = image.get_height();
+    if (!width || !height) return Promise.reject(new Error("HEIC has no image size."));
+    var canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    var ctx = canvas.getContext("2d");
+    var imageData = ctx.createImageData(width, height);
+    return new Promise(function (resolve, reject) {
+      image.display(imageData, function (displayData) {
+        if (!displayData) {
+          reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."));
+          return;
+        }
+        ctx.putImageData(displayData, 0, 0);
+        if (!canvas.toBlob) {
+          reject(new Error("This browser cannot encode JPEG."));
+          return;
+        }
+        canvas.toBlob(function (blob) {
+          if (!blob) { reject(new Error("JPEG encode failed.")); return; }
+          resolve(blob);
+        }, "image/jpeg", q);
+      });
+    });
+  }
+  function addRow(item) {
+    var li = document.createElement("li");
+    li.className = "row" + (item.ok ? "" : " fail");
+    if (item.ok && item.url) {
+      var img = document.createElement("img");
+      img.className = "thumb";
+      img.alt = "";
+      img.src = item.url;
+      li.appendChild(img);
+    }
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = item.outName || item.name;
+    li.appendChild(name);
+    if (item.ok) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Download .jpg";
+      btn.addEventListener("click", function () { downloadBlob(item.blob, item.outName); });
+      li.appendChild(btn);
+    }
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = item.ok
+      ? fmtBytes(item.srcSize) + " → " + fmtBytes(item.blob.size)
+      : item.error;
+    li.appendChild(meta);
+    listEl.appendChild(li);
+  }
+  function refreshBar() {
+    var ok = done.filter(function (x) { return x.ok; });
+    var fail = done.filter(function (x) { return !x.ok; });
+    var bits = [];
+    if (ok.length) bits.push(ok.length + (ok.length === 1 ? " JPEG" : " JPEGs"));
+    if (fail.length) bits.push(fail.length + (fail.length === 1 ? " failed" : " failed"));
+    countEl.textContent = bits.join(" · ");
+    results.classList.remove("hidden");
+    if (ok.length >= 2) zipBtn.classList.remove("hidden");
+    else zipBtn.classList.add("hidden");
+  }
+  async function handleFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    clearError();
+    if (files.length > MAX_FILES) {
+      showError("Too many files. Cap is " + MAX_FILES + " at once.");
+      return;
+    }
+    var total = 0;
+    for (var i = 0; i < files.length; i++) total += files[i].size;
+    if (total > MAX_TOTAL) {
+      showError("Total size is larger than 200 MB.");
+      return;
+    }
+    done.forEach(function (x) { if (x.url) URL.revokeObjectURL(x.url); });
+    done = [];
+    listEl.textContent = "";
+    results.classList.add("hidden");
+    zipBtn.classList.add("hidden");
+    var q = quality();
+    var loud = [];
+    for (var n = 0; n < files.length; n++) {
+      var file = files[n];
+      var item = { name: file.name, srcSize: file.size, ok: false };
+      if (file.size > MAX_FILE) {
+        item.error = "File is larger than 50 MB.";
+        loud.push(item.error + " (" + file.name + ")");
+        done.push(item);
+        addRow(item);
+        refreshBar();
+        continue;
+      }
+      try {
+        var buf = await file.arrayBuffer();
+        var check = looksHeic(buf, file.name);
+        if (!check.ok) {
+          item.error = check.reason;
+          loud.push(check.reason + " (" + file.name + ")");
+          done.push(item);
+          addRow(item);
+          refreshBar();
+          continue;
+        }
+        var blob = await decodeToJpeg(buf, q);
+        item.ok = true;
+        item.blob = blob;
+        item.outName = jpgName(file.name);
+        item.url = URL.createObjectURL(blob);
+        done.push(item);
+        addRow(item);
+        refreshBar();
+      } catch (e) {
+        item.error = e.message || String(e);
+        loud.push(item.error + " (" + file.name + ")");
+        done.push(item);
+        addRow(item);
+        refreshBar();
+      }
+    }
+    if (loud.length && !done.some(function (x) { return x.ok; })) {
+      showError(loud[0]);
+    } else if (loud.length) {
+      showError(loud.join(" "));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    if (e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files.length) handleFiles(input.files);
+    input.value = "";
+  });
+  zipBtn.addEventListener("click", function () {
+    var ok = done.filter(function (x) { return x.ok; });
+    if (ok.length < 2 || typeof JSZip === "undefined") return;
+    var zip = new JSZip();
+    var used = {};
+    for (var i = 0; i < ok.length; i++) {
+      var name = ok[i].outName;
+      if (used[name]) {
+        var n = 2;
+        var base = name.replace(/\.jpg$/, "");
+        while (used[base + "-" + n + ".jpg"]) n++;
+        name = base + "-" + n + ".jpg";
+      }
+      used[name] = 1;
+      zip.file(name, ok[i].blob);
+    }
+    zip.generateAsync({ type: "blob" }).then(function (blob) {
+      downloadBlob(blob, "heicjpg.zip");
+    });
+  });
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "06a8023403ad4e459798d369b21a7cb7"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
