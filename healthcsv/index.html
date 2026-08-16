@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>healthcsv — Apple Health to CSV</title>
-<meta name="description" content="Drop an Apple Health export.xml or zip, click a preset (or pick types and a date range), get a compact CSV or JSON. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="description" content="Drop an Apple Health export.xml or zip, pick metric types and a date range, get a compact CSV or JSON. Runs entirely in your browser. Nothing is uploaded.">
 <meta name="author" content="Georgi Pepelyankov">
 <meta property="og:type" content="website">
 <meta property="og:title" content="healthcsv — Apple Health to CSV">
-<meta property="og:description" content="Filter an Apple Health export with one-click presets, then export only those types and dates. Files never leave the browser.">
+<meta property="og:description" content="Filter an Apple Health export, then export only the types and dates you pick. Files never leave the browser.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2710%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Ecsv%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -47,7 +47,7 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 a{color:var(--accent)}
-button,input,textarea{font:inherit}
+button,input{font:inherit}
 button{
   background:var(--panel);
   color:var(--ink);
@@ -58,11 +58,7 @@ button{
 }
 button:hover{border-color:var(--accent);color:var(--accent)}
 button:disabled{opacity:.5;cursor:not-allowed}
-button.primary{
-  background:var(--accent);color:#fff;border-color:var(--accent);
-}
-button.primary:hover{color:#fff;filter:brightness(1.06)}
-button:focus-visible,a:focus-visible,.drop:focus-visible,input:focus-visible,textarea:focus-visible{
+button:focus-visible,a:focus-visible,.drop:focus-visible,input:focus-visible{
   outline:2px solid var(--accent);outline-offset:3px;
 }
 .page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
@@ -99,13 +95,11 @@ h1{
   background:var(--panel);
 }
 .meta{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin:0 0 .7rem}
-.presets{display:flex;flex-wrap:wrap;gap:.45rem;margin:0 0 .35rem}
-.presets button.on{border-color:var(--accent);color:var(--accent);background:var(--paper)}
-.dates{display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:end;margin:.85rem 0}
+.dates{display:flex;flex-wrap:wrap;gap:.7rem 1rem;align-items:end;margin:0 0 .85rem}
 .dates label{display:flex;flex-direction:column;gap:.2rem;font-family:var(--mono);font-size:.74rem;color:var(--muted)}
 .dates input{color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:.3rem .45rem}
 .types{
-  max-height:14rem;overflow:auto;margin:0;padding:0;list-style:none;
+  max-height:18rem;overflow:auto;margin:0;padding:0;list-style:none;
   border-top:1px solid var(--rule);
 }
 .types li{display:grid;grid-template-columns:auto 1fr auto;gap:.45rem .6rem;align-items:center;padding:.45rem .1rem;border-bottom:1px solid var(--rule)}
@@ -114,12 +108,6 @@ h1{
 .hint{margin:.7rem 0 0;color:var(--muted);font-size:.86rem}
 .toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1rem 0 0}
 .count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
-.preview{
-  display:block;margin:.75rem 0 0;width:100%;min-height:10rem;max-height:22rem;
-  padding:.7rem .8rem;border:1px solid var(--rule);border-radius:6px;
-  background:var(--paper);color:var(--ink);
-  font-family:var(--mono);font-size:.78rem;line-height:1.45;resize:vertical;
-}
 footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
 footer p{margin:.4rem 0 0}
 .hidden{display:none}
@@ -130,12 +118,12 @@ footer p{margin:.4rem 0 0}
   <header>
     <p class="eyebrow"><a href="https://aithings.online">aithings</a> / healthcsv</p>
     <h1>Apple Health, filtered.</h1>
-    <p class="lede">Drop <code>export.xml</code> or the Health zip. One click for a preset.
-      Get a compact CSV — not the whole dump.</p>
+    <p class="lede">Drop <code>export.xml</code> or the Health zip. Pick types and a date range.
+      Get a compact CSV or JSON — not the whole dump.</p>
   </header>
   <label class="drop" id="drop" tabindex="0">
     <strong>Drop export.xml or export.zip here, or click to choose</strong>
-    Apple Health export. Preset, then export.
+    Apple Health export. Filter first, then export.
     <input id="file" type="file" accept=".xml,.zip,application/zip,text/xml,application/xml" hidden>
   </label>
   <p class="privacy">Files never leave the browser. There is no server and no account.</p>
@@ -143,27 +131,22 @@ footer p{margin:.4rem 0 0}
   <p class="warn hidden" id="warn" role="status"></p>
   <div id="results" class="panel hidden">
     <p class="meta" id="summary"></p>
-    <div class="presets" id="presets" role="group" aria-label="Presets"></div>
-    <p class="hint">One click sets types and the date range. Ranges are relative to the
-      latest date in the file, not the computer clock. “This year” is 1 January of that year through
-      that latest date. You can still tick extra types or change the range after a preset.</p>
     <div class="dates">
       <label>From <input type="date" id="from"></label>
       <label>To <input type="date" id="to"></label>
     </div>
     <ul class="types" id="types"></ul>
+    <p class="hint">Nothing is selected. Tick the types you want. Common ones if present:
+      StepCount, HeartRate, BodyMass, SleepAnalysis. This will not dump the whole file.</p>
     <div class="toolbar">
       <span class="count" id="count"></span>
-      <button type="button" id="export" class="primary" disabled>Export CSV</button>
       <button type="button" id="copy" disabled>Copy CSV</button>
       <button type="button" id="dlcsv" disabled>Download CSV</button>
       <button type="button" id="dljson" disabled>Download JSON</button>
     </div>
-    <textarea class="preview hidden" id="preview" readonly aria-label="CSV preview"></textarea>
   </div>
   <footer>
-    <p>Caps: warn over 80&nbsp;MB, refuse over 250&nbsp;MB (and anything multi-GB).
-      Unknown files and ZIPs without
+    <p>Caps: warn over 80&nbsp;MB, refuse over 250&nbsp;MB. Unknown files and ZIPs without
       <code>export.xml</code> fail with an error. Clinical / CDA / ECG files are ignored.
       Record and Workout only.</p>
     <p><a href="https://github.com/kr3t3n/healthcsv">source</a>
@@ -185,25 +168,6 @@ footer p{margin:.4rem 0 0}
     "duration", "durationUnit", "totalDistance", "totalDistanceUnit",
     "totalEnergyBurned", "totalEnergyBurnedUnit"
   ];
-  var STEPS = [
-    "HKQuantityTypeIdentifierStepCount",
-    "HKQuantityTypeIdentifierDistanceWalkingRunning",
-    "HKQuantityTypeIdentifierFlightsClimbed"
-  ];
-  var HEART = [
-    "HKQuantityTypeIdentifierHeartRate",
-    "HKQuantityTypeIdentifierRestingHeartRate",
-    "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
-    "HKQuantityTypeIdentifierWalkingHeartRateAverage"
-  ];
-  var SLEEP = ["HKCategoryTypeIdentifierSleepAnalysis"];
-  var PRESETS = [
-    { id: "w30", label: "Last 30 days · workouts", days: 30, mode: "workouts" },
-    { id: "s30", label: "Last 30 days · steps / walking", days: 30, types: STEPS },
-    { id: "h30", label: "Last 30 days · heart", days: 30, types: HEART },
-    { id: "sl90", label: "Last 90 days · sleep", days: 90, types: SLEEP },
-    { id: "year", label: "This year · workouts + steps", year: "file", mode: "workouts+steps" }
-  ];
 
   var drop = document.getElementById("drop");
   var input = document.getElementById("file");
@@ -211,18 +175,15 @@ footer p{margin:.4rem 0 0}
   var warnEl = document.getElementById("warn");
   var results = document.getElementById("results");
   var summaryEl = document.getElementById("summary");
-  var presetsEl = document.getElementById("presets");
   var typesEl = document.getElementById("types");
   var fromEl = document.getElementById("from");
   var toEl = document.getElementById("to");
   var countEl = document.getElementById("count");
-  var exportBtn = document.getElementById("export");
   var copyBtn = document.getElementById("copy");
   var csvBtn = document.getElementById("dlcsv");
   var jsonBtn = document.getElementById("dljson");
-  var previewEl = document.getElementById("preview");
 
-  var state = { xml: "", types: [], minD: "", maxD: "", n: 0, csv: "", json: "", rows: 0, preset: "" };
+  var state = { xml: "", types: [], minD: "", maxD: "", n: 0 };
 
   function showError(msg) {
     errEl.textContent = msg;
@@ -270,9 +231,6 @@ footer p{margin:.4rem 0 0}
     if (kind === "Workout") return attrs.workoutActivityType || "Workout";
     return attrs.type || "";
   }
-  function isWorkoutType(t) {
-    return t.kind === "Workout" || t.type === "Workout" || t.type.indexOf("HKWorkoutActivityType") === 0;
-  }
   function looksHealth(text) {
     if (!text || text.length < 40) return false;
     if (text.indexOf("<ClinicalDocument") !== -1 && text.indexOf("<HealthData") === -1) return false;
@@ -296,21 +254,10 @@ footer p{margin:.4rem 0 0}
     if (day.length < 2) day = "0" + day;
     return d.getUTCFullYear() + "-" + m + "-" + day;
   }
-  function clampFrom(from, minD) {
-    if (minD && from && from < minD) return minD;
-    return from;
-  }
-  function rangeForPreset(preset, minD, maxD) {
-    var to = maxD || "";
-    var from = minD || "";
-    if (to && preset.days) from = addDays(to, -(preset.days - 1));
-    else if (to && preset.year === "file") from = to.slice(0, 4) + "-01-01";
-    from = clampFrom(from, minD);
-    return { from: from, to: to };
-  }
   function defaultFrom(minD, maxD) {
     if (!minD || !maxD) return minD || "";
-    return clampFrom(addDays(maxD, -89), minD);
+    var cut = addDays(maxD, -89);
+    return cut > minD ? cut : minD;
   }
   function scanHealth(xml) {
     var types = {};
@@ -395,55 +342,12 @@ footer p{margin:.4rem 0 0}
     }
     return { map: sel, n: n };
   }
-  function setBoxes(want) {
-    var boxes = typesEl.querySelectorAll("input[type=checkbox]");
-    for (var i = 0; i < boxes.length; i++) boxes[i].checked = !!want[boxes[i].value];
-  }
-  function wantedForPreset(preset, list) {
-    var want = {};
-    var i;
-    if (preset.mode === "workouts" || preset.mode === "workouts+steps") {
-      for (i = 0; i < list.length; i++) {
-        if (isWorkoutType(list[i])) want[list[i].type] = 1;
-      }
-    }
-    if (preset.mode === "workouts+steps") want.HKQuantityTypeIdentifierStepCount = 1;
-    if (preset.types) {
-      for (i = 0; i < preset.types.length; i++) want[preset.types[i]] = 1;
-    }
-    return want;
-  }
-  function markPreset(id) {
-    state.preset = id || "";
-    var btns = presetsEl.querySelectorAll("button");
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle("on", btns[i].getAttribute("data-id") === state.preset);
-    }
-  }
-  function applyPreset(preset) {
-    var r = rangeForPreset(preset, state.minD, state.maxD);
-    fromEl.value = r.from;
-    toEl.value = r.to;
-    setBoxes(wantedForPreset(preset, state.types));
-    markPreset(preset.id);
-    clearBuilt();
-    refreshButtons();
-  }
-  function clearBuilt() {
-    state.csv = "";
-    state.json = "";
-    state.rows = 0;
-    previewEl.value = "";
-    previewEl.classList.add("hidden");
-  }
   function refreshButtons() {
     var on = selectedTypes().n > 0 && !!state.xml;
-    exportBtn.disabled = !on;
     copyBtn.disabled = !on;
     csvBtn.disabled = !on;
     jsonBtn.disabled = !on;
-    if (!on) countEl.textContent = "Click a preset, or tick types.";
-    else if (!state.csv) countEl.textContent = "Export only the ticked types in range.";
+    countEl.textContent = on ? "Export only the ticked types in range." : "Pick at least one type.";
   }
   function shortType(t) {
     return t
@@ -451,20 +355,6 @@ footer p{margin:.4rem 0 0}
       .replace(/^HKCategoryTypeIdentifier/, "")
       .replace(/^HKCorrelationTypeIdentifier/, "")
       .replace(/^HKWorkoutActivityType/, "Workout/");
-  }
-  function renderPresets() {
-    presetsEl.textContent = "";
-    for (var i = 0; i < PRESETS.length; i++) {
-      var p = PRESETS[i];
-      var b = document.createElement("button");
-      b.type = "button";
-      b.setAttribute("data-id", p.id);
-      b.textContent = p.label;
-      b.addEventListener("click", (function (preset) {
-        return function () { applyPreset(preset); };
-      })(p));
-      presetsEl.appendChild(b);
-    }
   }
   function renderTypes(list) {
     typesEl.textContent = "";
@@ -507,19 +397,15 @@ footer p{margin:.4rem 0 0}
     return hits[0] || null;
   }
   function resetUi() {
-    state = { xml: "", types: [], minD: "", maxD: "", n: 0, csv: "", json: "", rows: 0, preset: "" };
+    state = { xml: "", types: [], minD: "", maxD: "", n: 0 };
     results.classList.add("hidden");
     typesEl.textContent = "";
     summaryEl.textContent = "";
     countEl.textContent = "";
-    exportBtn.disabled = true;
     copyBtn.disabled = true;
     csvBtn.disabled = true;
     jsonBtn.disabled = true;
     copyBtn.textContent = "Copy CSV";
-    previewEl.value = "";
-    previewEl.classList.add("hidden");
-    markPreset("");
   }
   function applyScan(xml, extraWarn) {
     if (looksCda(xml) && !looksHealth(xml)) {
@@ -545,10 +431,9 @@ footer p{margin:.4rem 0 0}
     toEl.min = scanned.minD || "";
     toEl.max = scanned.maxD || "";
     renderTypes(scanned.types);
-    renderPresets();
     var range = (scanned.minD && scanned.maxD) ? (scanned.minD + " → " + scanned.maxD) : "no dates";
     summaryEl.textContent = scanned.types.length + " types · " + scanned.n + " records · " + range +
-      ". Preset ranges use the file’s latest date.";
+      ". Date inputs default to the last 90 days of the file.";
     results.classList.remove("hidden");
     refreshButtons();
     if (extraWarn) showWarn(extraWarn);
@@ -586,7 +471,7 @@ footer p{margin:.4rem 0 0}
     }
     var sizeWarn = "";
     if (file.size > WARN_BYTES) {
-      sizeWarn = "This file is " + fmtBytes(file.size) + ". The tab may get slow. Use a preset or a short date range.";
+      sizeWarn = "This file is " + fmtBytes(file.size) + ". The tab may get slow. Pick a few types and a short date range.";
     }
     try {
       var buf = await file.arrayBuffer();
@@ -605,7 +490,7 @@ footer p{margin:.4rem 0 0}
         xml = text;
       }
       if (innerWarn > WARN_BYTES && !sizeWarn) {
-        sizeWarn = "export.xml is " + fmtBytes(innerWarn) + ". The tab may get slow. Use a preset or a short date range.";
+        sizeWarn = "export.xml is " + fmtBytes(innerWarn) + ". The tab may get slow. Pick a few types and a short date range.";
       }
       applyScan(xml, sizeWarn);
     } catch (e) {
@@ -617,26 +502,6 @@ footer p{margin:.4rem 0 0}
     var sel = selectedTypes();
     if (!sel.n) throw new Error("Pick at least one type.");
     return collectRows(state.xml, sel.map, fromEl.value || "", toEl.value || "");
-  }
-  function previewCsv(csv) {
-    var lines = csv.split("\n");
-    var max = 81;
-    if (lines.length > max) {
-      previewEl.value = lines.slice(0, max).join("\n") + "\n… [" + (lines.length - max) + " more lines not shown]";
-    } else {
-      previewEl.value = csv;
-    }
-    previewEl.classList.remove("hidden");
-  }
-  function buildExport() {
-    var rows = currentRows();
-    var csv = toCsv(rows);
-    state.rows = rows.length;
-    state.csv = csv;
-    state.json = JSON.stringify(rows);
-    countEl.textContent = rows.length + " rows · " + fmtBytes(csv.length);
-    previewCsv(csv);
-    return rows;
   }
   function downloadBlob(blob, name) {
     var a = document.createElement("a");
@@ -661,21 +526,16 @@ footer p{margin:.4rem 0 0}
     if (input.files && input.files[0]) handleFile(input.files[0]);
     input.value = "";
   });
-  typesEl.addEventListener("change", function () {
-    markPreset("");
-    clearBuilt();
-    refreshButtons();
-  });
-  fromEl.addEventListener("change", function () { clearBuilt(); refreshButtons(); });
-  toEl.addEventListener("change", function () { clearBuilt(); refreshButtons(); });
-  exportBtn.addEventListener("click", function () {
-    try { buildExport(); } catch (e) { showError(e.message || String(e)); }
-  });
+  typesEl.addEventListener("change", refreshButtons);
+  fromEl.addEventListener("change", refreshButtons);
+  toEl.addEventListener("change", refreshButtons);
   copyBtn.addEventListener("click", function () {
     try {
-      if (!state.csv) buildExport();
+      var rows = currentRows();
+      var csv = toCsv(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(csv.length) + " (not shown).";
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(state.csv).then(function () {
+        navigator.clipboard.writeText(csv).then(function () {
           copyBtn.textContent = "Copied";
           setTimeout(function () { copyBtn.textContent = "Copy CSV"; }, 1200);
         }).catch(function () { showError("Could not copy. Download the CSV instead."); });
@@ -686,25 +546,20 @@ footer p{margin:.4rem 0 0}
   });
   csvBtn.addEventListener("click", function () {
     try {
-      if (!state.csv) buildExport();
-      downloadBlob(new Blob([state.csv], { type: "text/csv;charset=utf-8" }), "healthcsv.csv");
+      var rows = currentRows();
+      var csv = toCsv(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(csv.length) + " (not shown).";
+      downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "healthcsv.csv");
     } catch (e) { showError(e.message || String(e)); }
   });
   jsonBtn.addEventListener("click", function () {
     try {
-      if (!state.json) buildExport();
-      downloadBlob(new Blob([state.json], { type: "application/json;charset=utf-8" }), "healthcsv.json");
+      var rows = currentRows();
+      var json = JSON.stringify(rows);
+      countEl.textContent = rows.length + " rows · " + fmtBytes(json.length) + " (not shown).";
+      downloadBlob(new Blob([json], { type: "application/json;charset=utf-8" }), "healthcsv.json");
     } catch (e) { showError(e.message || String(e)); }
   });
-  window.HealthCsv = {
-    PRESETS: PRESETS,
-    scanHealth: scanHealth,
-    collectRows: collectRows,
-    rangeForPreset: rangeForPreset,
-    wantedForPreset: wantedForPreset,
-    toCsv: toCsv,
-    addDays: addDays
-  };
 })();
 </script>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "620f149b732d4123992eabbb9ff601da"}'></script><!-- End Cloudflare Web Analytics -->
