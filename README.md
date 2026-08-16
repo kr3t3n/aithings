@@ -15,6 +15,7 @@ open-source web tools.
 | [heicjpg](https://aithings.online/heicjpg/) | Drop iPhone .heic photos, get JPEGs. | [kr3t3n/heicjpg](https://github.com/kr3t3n/heicjpg) |
 | [healthcsv](https://aithings.online/healthcsv/) | Drop an Apple Health export, click a preset (or pick types + dates), get a compact CSV/JSON. | [kr3t3n/healthcsv](https://github.com/kr3t3n/healthcsv) |
 | [kindlemd](https://aithings.online/kindlemd/) | Drop Kindle My Clippings.txt, get one Markdown file per book. | [kr3t3n/kindlemd](https://github.com/kr3t3n/kindlemd) |
+| [docxmd](https://aithings.online/docxmd/) | Drop a Word .docx, copy Markdown. | [kr3t3n/docxmd](https://github.com/kr3t3n/docxmd) |
 
 ## What this repo is
 
@@ -29,6 +30,7 @@ served as a folder on aithings.online:
 - `/heicjpg/`
 - `/healthcsv/`
 - `/kindlemd/`
+- `/docxmd/`
 
 flatten.site and makejson.online stay on their own domains. Source of truth for
 each tool is still its own repo; this tree is the public folder host.

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>docxmd — Word to markdown</title>
+<meta name="description" content="Drop a Word .docx and copy Markdown. Runs entirely in your browser. Nothing is uploaded.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="docxmd — Word to markdown">
+<meta property="og:description" content="Drop a .docx, copy Markdown. The file never leaves the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Emd%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.preview{
+  display:block;margin:0;width:100%;min-height:14rem;max-height:32rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / docxmd</p>
+    <h1>Word to markdown.</h1>
+    <p class="lede">Drop a <code>.docx</code>. Copy Markdown. Old <code>.doc</code> files fail.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a .docx here, or click to choose</strong>
+    Word OOXML only. Nothing is uploaded.
+    <input id="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+  </label>
+  <p class="privacy">The file never leaves the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="copy">Copy</button>
+      <button type="button" id="dl">Download .md</button>
+    </div>
+    <textarea class="preview" id="preview" readonly aria-label="Markdown output"></textarea>
+  </div>
+  <footer>
+    <p>Caps: 50&nbsp;MB. Accepts <code>.docx</code> (ZIP + <code>word/document.xml</code>).
+      Old <code>.doc</code>, <code>.pptx</code>, and random files fail with an error.</p>
+    <p><a href="https://github.com/kr3t3n/docxmd">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/mammoth.browser.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX = 50 * 1024 * 1024;
+  var OLE = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var countEl = document.getElementById("count");
+  var preview = document.getElementById("preview");
+  var copyBtn = document.getElementById("copy");
+  var dlBtn = document.getElementById("dl");
+  var markdown = "";
+  var outName = "document.md";
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    markdown = "";
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function looksOle(u) {
+    if (u.length < 8) return false;
+    for (var i = 0; i < 8; i++) if (u[i] !== OLE[i]) return false;
+    return true;
+  }
+  function looksZip(u) {
+    return u.length >= 4 && u[0] === 0x50 && u[1] === 0x4B &&
+      (u[2] === 0x03 || u[2] === 0x05 || u[2] === 0x07) &&
+      (u[3] === 0x04 || u[3] === 0x06 || u[3] === 0x08);
+  }
+  function asciiHas(u, s) {
+    var n = s.length;
+    if (u.length < n) return false;
+    outer: for (var i = 0; i <= u.length - n; i++) {
+      for (var j = 0; j < n; j++) {
+        if (u[i + j] !== s.charCodeAt(j)) continue outer;
+      }
+      return true;
+    }
+    return false;
+  }
+  function sanitiseFilename(name) {
+    var s = String(name || "document")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .replace(/\.docx$/i, "")
+      .slice(0, 80);
+    return (s || "document") + ".md";
+  }
+  function classify(buf, name) {
+    var u = new Uint8Array(buf);
+    var lower = String(name || "").toLowerCase();
+    if (looksOle(u) || (lower.endsWith(".doc") && !lower.endsWith(".docx"))) {
+      throw new Error("This is an old Word .doc (OLE compound), not a .docx. Save as .docx in Word and drop that.");
+    }
+    if (!looksZip(u)) {
+      throw new Error("Not a .docx. Drop a Word .docx file (ZIP containing word/document.xml).");
+    }
+    var hasWord = asciiHas(u, "word/document.xml");
+    var hasPpt = asciiHas(u, "ppt/presentation.xml");
+    if (hasPpt && !hasWord) {
+      throw new Error("This is a PowerPoint .pptx, not a Word .docx.");
+    }
+    if (!hasWord) {
+      throw new Error("Not a .docx: ZIP is missing word/document.xml.");
+    }
+  }
+  function render(md, name) {
+    markdown = md;
+    outName = sanitiseFilename(name);
+    var lines = md ? md.replace(/\n+$/, "").split("\n").length : 0;
+    countEl.textContent = lines + (lines === 1 ? " line" : " lines") + " · " + outName;
+    preview.value = md;
+    results.classList.remove("hidden");
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("File is larger than 50 MB.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      classify(buf, file.name);
+      var result = await mammoth.convertToMarkdown(
+        { arrayBuffer: buf },
+        {
+          convertImage: mammoth.images.imgElement(function (image) {
+            return image.altText.then(function (alt) {
+              return { src: "", alt: alt || "image" };
+            });
+          })
+        }
+      );
+      var md = (result && result.value) ? String(result.value) : "";
+      if (!md.replace(/\s+/g, "")) {
+        throw new Error("The document converted to empty Markdown.");
+      }
+      render(md, file.name);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  copyBtn.addEventListener("click", async function () {
+    if (!markdown) return;
+    try {
+      await navigator.clipboard.writeText(markdown);
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = "Copy"; }, 1200);
+    } catch (err) {
+      preview.focus();
+      preview.select();
+    }
+  });
+  dlBtn.addEventListener("click", function () {
+    if (!markdown) return;
+    downloadBlob(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), outName);
+  });
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "ca9863f0fc1b4fc9b77e335932721a97"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
