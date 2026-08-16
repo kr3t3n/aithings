@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scrub — redact secrets before you paste them into an AI</title>
+<meta name="description" content="Drop or paste a log, snippet, .env, or dump. API keys, tokens, connection strings, emails, and IPs become stable placeholders. Runs entirely in your browser.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="scrub — redact secrets before you paste them into an AI">
+<meta property="og:description" content="Drop or paste a log or .env. Secrets become stable placeholders. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Esc%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.or{margin:1rem 0 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase}
+.src{
+  display:block;margin:.7rem 0 0;width:100%;min-height:9rem;max-height:20rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+table{width:100%;border-collapse:collapse;margin:.4rem 0 1rem;font-size:.82rem}
+th,td{text-align:left;padding:.45rem .35rem;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td{font-family:var(--mono);word-break:break-all}
+td.orig{word-break:break-all;max-width:14rem}
+.preview{
+  display:block;margin:0;width:100%;min-height:12rem;max-height:24rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.empty{margin:.4rem 0 1rem;color:var(--muted);font-size:.9rem}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / scrub</p>
+    <h1>Redact secrets before you paste them into an AI.</h1>
+    <p class="lede">Drop or paste a log, snippet, <code>.env</code>, or dump.
+      Keys, tokens, connection strings, emails, and IPs become stable placeholders.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a text file here, or click to choose</strong>
+    .txt .log .env .json .yml .md .csv .conf .ini .sh .js .ts .py
+    <input id="file" type="file" hidden>
+  </label>
+  <p class="or">or paste</p>
+  <textarea class="src" id="src" spellcheck="false" placeholder="OPENAI_API_KEY=sk-…&#10;DATABASE_URL=postgres://…"></textarea>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="copy">Copy redacted</button>
+      <button type="button" id="dl">Download .txt</button>
+    </div>
+    <div id="tablewrap"></div>
+    <textarea class="preview" id="preview" readonly aria-label="Redacted text"></textarea>
+  </div>
+  <footer>
+    <p>Same secret becomes the same placeholder in one run.
+      Caps: 50&nbsp;MB. Binary files fail with an error.
+      Regex will miss custom tokens — this is not a security boundary.</p>
+    <p><a href="https://github.com/kr3t3n/scrub">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script>
+(function () {
+  "use strict";
+  var MAX = 50 * 1024 * 1024;
+  var TEXT_EXT = {
+    txt:1, log:1, env:1, json:1, yml:1, yaml:1, md:1, csv:1, conf:1, ini:1,
+    sh:1, bash:1, zsh:1, fish:1, js:1, ts:1, jsx:1, tsx:1, mjs:1, cjs:1, py:1,
+    rb:1, go:1, rs:1, java:1, kt:1, php:1, xml:1, toml:1, cfg:1, cnf:1,
+    sql:1, tf:1, hcl:1, properties:1, html:1, htm:1, css:1, scss:1, vue:1,
+    graphql:1, proto:1, r:1, lua:1, pl:1, swift:1, cs:1, cpp:1, c:1, h:1,
+    hpp:1, cc:1, sample:1, example:1, local:1, production:1, development:1
+  };
+  var SCHEMES = { mailto:1, http:1, https:1, ftp:1, file:1, data:1 };
+
+  function isSecretName(name) {
+    return /(?:^|_)(KEY|TOKEN|SECRET|PASSWORD|PASSWD|PASS)$/i.test(name)
+      || /^(KEY|TOKEN|SECRET|PASSWORD|PASSWD|PASS)$/i.test(name)
+      || /API[_-]?KEY/i.test(name)
+      || /ACCESS[_-]?KEY/i.test(name);
+  }
+  function looksSecretValue(v) {
+    if (!v || v.length < 16) return false;
+    if (/^\[[A-Z0-9_]+\]$/.test(v)) return false;
+    if (/^(true|false|none|null|undefined|default|example|changeme)$/i.test(v)) return false;
+    return true;
+  }
+
+  var RULES = [
+    { type: "Private key", slug: "PRIVATE_KEY",
+      re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/g },
+    { type: "Connection string", slug: "CONN",
+      re: /(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|rediss|amqps?):\/\/[^\s"'<>]+/gi },
+    { type: "Credential", slug: "USERPASS",
+      re: /(?:^|[\s"'=])([A-Za-z0-9._%+-]+:[^@\s/"']+@[A-Za-z0-9.-]+)/g, group: 1,
+      ok: function (m) { return !SCHEMES[m[1].split(":")[0].toLowerCase()]; } },
+    { type: "Anthropic key", slug: "ANTHROPIC_KEY",
+      re: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g },
+    { type: "OpenRouter key", slug: "OPENROUTER_KEY",
+      re: /\bsk-or-[A-Za-z0-9_-]{20,}\b/g },
+    { type: "OpenAI key", slug: "OPENAI_KEY",
+      re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g },
+    { type: "GitHub token", slug: "GITHUB_TOKEN",
+      re: /\b(?:ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{20,})\b/g },
+    { type: "Slack token", slug: "SLACK_TOKEN",
+      re: /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g },
+    { type: "AWS key", slug: "AWS_KEY",
+      re: /\bAKIA[0-9A-Z]{16}\b/g },
+    { type: "Google key", slug: "GOOGLE_KEY",
+      re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+    { type: "JWT", slug: "JWT",
+      re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
+    { type: "Bearer token", slug: "BEARER",
+      re: /\bBearer\s+([A-Za-z0-9._\-+/=]{16,})/g, group: 1 },
+    { type: "AWS secret", slug: "AWS_SECRET",
+      re: /\b(?:aws_secret_access_key|AWS_SECRET_ACCESS_KEY)\s*[=:]\s*['"]?([A-Za-z0-9/+=]{40})['"]?/g, group: 1 },
+    { type: "Secret", slug: "SECRET",
+      re: /^[ \t]*(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)[ \t]*[=:][ \t]*['"]?([^\s'"]{16,})['"]?[ \t]*$/gm, group: 2,
+      ok: function (m) { return isSecretName(m[1]) && looksSecretValue(m[2]); } },
+    { type: "Email", slug: "EMAIL",
+      re: /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g },
+    { type: "IPv4", slug: "IPV4",
+      re: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g },
+    { type: "IPv6", slug: "IPV6",
+      re: /\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b|\b(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4}){0,6})?::(?:[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4}){0,6})?\b/g,
+      ok: function (m) {
+        if (m[0] === "::1") return true;
+        if (!/[a-fA-F]/.test(m[0])) return false;
+        return (m[0].match(/:/g) || []).length >= 2 && m[0].length >= 5;
+      } }
+  ];
+
+  function collect(text) {
+    var found = [];
+    for (var i = 0; i < RULES.length; i++) {
+      var rule = RULES[i];
+      var flags = rule.re.flags.indexOf("g") >= 0 ? rule.re.flags : rule.re.flags + "g";
+      var re = new RegExp(rule.re.source, flags);
+      var m;
+      while ((m = re.exec(text))) {
+        if (rule.ok && !rule.ok(m)) continue;
+        var full = m[0];
+        var secret = rule.group ? m[rule.group] : full;
+        if (!secret) continue;
+        var offset = 0;
+        if (rule.group) {
+          offset = full.indexOf(secret);
+          if (offset < 0) offset = 0;
+        }
+        var start = m.index + offset;
+        found.push({ start: start, end: start + secret.length, secret: secret, type: rule.type, slug: rule.slug });
+        if (m[0].length === 0) re.lastIndex++;
+      }
+    }
+    found.sort(function (a, b) {
+      return a.start - b.start || (b.end - b.start) - (a.end - a.start);
+    });
+    var kept = [];
+    var cursor = 0;
+    for (var j = 0; j < found.length; j++) {
+      var h = found[j];
+      if (h.start < cursor) continue;
+      kept.push(h);
+      cursor = h.end;
+    }
+    return kept;
+  }
+
+  function scrub(text) {
+    var hits = collect(text);
+    var bySecret = Object.create(null);
+    var counters = Object.create(null);
+    var findings = [];
+    var out = "";
+    var pos = 0;
+    for (var i = 0; i < hits.length; i++) {
+      var h = hits[i];
+      var ph = bySecret[h.secret];
+      if (!ph) {
+        counters[h.slug] = (counters[h.slug] || 0) + 1;
+        ph = "[" + h.slug + "_" + counters[h.slug] + "]";
+        bySecret[h.secret] = ph;
+        findings.push({ type: h.type, original: h.secret, placeholder: ph, count: 0 });
+      }
+      for (var k = 0; k < findings.length; k++) {
+        if (findings[k].placeholder === ph) { findings[k].count++; break; }
+      }
+      out += text.slice(pos, h.start) + ph;
+      pos = h.end;
+    }
+    out += text.slice(pos);
+    return { text: out, findings: findings };
+  }
+
+  function trunc(s, n) {
+    n = n || 64;
+    if (s.length <= n) return s;
+    return s.slice(0, n - 10) + "…" + s.slice(-8);
+  }
+  function extOf(name) {
+    var base = (name || "").split(/[/\\]/).pop() || "";
+    if (base.charAt(0) === "." && base.indexOf(".", 1) < 0) return base.slice(1).toLowerCase();
+    var i = base.lastIndexOf(".");
+    return i >= 0 ? base.slice(i + 1).toLowerCase() : "";
+  }
+  function looksBinary(buf) {
+    var n = Math.min(buf.byteLength, 8192);
+    var u = new Uint8Array(buf, 0, n);
+    var bad = 0;
+    for (var i = 0; i < n; i++) {
+      if (u[i] === 0) return true;
+      if (u[i] < 7 || (u[i] > 13 && u[i] < 32 && u[i] !== 9)) bad++;
+    }
+    return n > 0 && bad / n > 0.15;
+  }
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var src = document.getElementById("src");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var countEl = document.getElementById("count");
+  var tablewrap = document.getElementById("tablewrap");
+  var preview = document.getElementById("preview");
+  var copyBtn = document.getElementById("copy");
+  var dlBtn = document.getElementById("dl");
+  var lastName = "scrubbed.txt";
+  var redacted = "";
+  var timer = 0;
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    redacted = "";
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function render(text) {
+    var r = scrub(text);
+    redacted = r.text;
+    preview.value = r.text;
+    var n = r.findings.length;
+    var hits = 0;
+    for (var i = 0; i < r.findings.length; i++) hits += r.findings[i].count;
+    countEl.textContent = n ? (n + (n === 1 ? " secret" : " secrets") + " · " + hits + (hits === 1 ? " hit" : " hits")) : "No secrets found";
+    if (!n) {
+      tablewrap.innerHTML = "<p class=\"empty\">Nothing matched the regex pack. The text below is unchanged.</p>";
+    } else {
+      var html = "<table><thead><tr><th>Type</th><th>Original</th><th>Placeholder</th><th>Count</th></tr></thead><tbody>";
+      for (var j = 0; j < r.findings.length; j++) {
+        var f = r.findings[j];
+        html += "<tr><td>" + esc(f.type) + "</td><td class=\"orig\" title=\"" + esc(f.original) + "\">" + esc(trunc(f.original)) + "</td><td>" + esc(f.placeholder) + "</td><td>" + f.count + "</td></tr>";
+      }
+      html += "</tbody></table>";
+      tablewrap.innerHTML = html;
+    }
+    results.classList.remove("hidden");
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function runFromTextarea() {
+    var text = src.value;
+    if (!text) {
+      results.classList.add("hidden");
+      redacted = "";
+      return;
+    }
+    if (new Blob([text]).size > MAX) {
+      showError("Paste is larger than 50 MB.");
+      return;
+    }
+    clearError();
+    render(text);
+  }
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("File is larger than 50 MB.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      if (looksBinary(buf)) {
+        showError("That looks like a binary file. Drop a text file (.txt, .log, .env, .json, …).");
+        return;
+      }
+      var ext = extOf(file.name);
+      if (ext && !TEXT_EXT[ext] && file.size > 2 * 1024 * 1024) {
+        showError("Unknown file type and it is huge. Drop a text file (.txt, .log, .env, .json, …).");
+        return;
+      }
+      var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+      src.value = text;
+      var base = (file.name || "file").replace(/\.[^.]+$/, "");
+      lastName = (base || "file") + ".scrubbed.txt";
+      render(text);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  src.addEventListener("input", function () {
+    lastName = "scrubbed.txt";
+    clearTimeout(timer);
+    timer = setTimeout(runFromTextarea, 80);
+  });
+  src.addEventListener("paste", function () {
+    lastName = "scrubbed.txt";
+    setTimeout(runFromTextarea, 0);
+  });
+  copyBtn.addEventListener("click", function () {
+    if (!redacted && redacted !== "") return;
+    navigator.clipboard.writeText(redacted).then(function () {
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = "Copy redacted"; }, 1200);
+    });
+  });
+  dlBtn.addEventListener("click", function () {
+    var blob = new Blob([redacted], { type: "text/plain;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = lastName;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  window.Scrub = { scrub: scrub, collect: collect };
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "94fa6bd9df994ce3b7b6e6cca899f05f"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

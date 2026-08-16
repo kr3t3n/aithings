@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tgmd — export Telegram chats to markdown</title>
+<meta name="description" content="Drop a Telegram Desktop result.json or export ZIP and get one Markdown file per chat. Runs entirely in your browser.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="tgmd — export Telegram chats to markdown">
+<meta property="og:description" content="Drop a Telegram Desktop export, get one .md per chat. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2714%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Emd%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / tgmd</p>
+    <h1>Export Telegram chats to markdown.</h1>
+    <p class="lede">Drop Telegram Desktop <code>result.json</code> or the export ZIP.
+      Get one <code>.md</code> per chat to read, grep, or paste into another model.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a ZIP or result.json here, or click to choose</strong>
+    Telegram Desktop: Settings → Advanced → Export Telegram data.
+    <input id="file" type="file" accept=".zip,application/zip,application/json,.json" hidden>
+  </label>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="all">Download all as ZIP</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+  <footer>
+    <p>Unknown ZIPs fail with an error — they do not produce empty files.
+      Caps: 50&nbsp;MB ZIP, 200 entries, 50&nbsp;MB JSON.</p>
+    <p><a href="https://github.com/kr3t3n/tgmd">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor.js"></script>
+<script src="./app.js"></script>
+<script src="./ui.js"></script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "d15f2fbc9dc440e2899caf09bd8b0799"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

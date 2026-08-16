@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nbmd — notebook to markdown</title>
+<meta name="description" content="Drop a Jupyter .ipynb and copy Markdown of the code and notes. Plots and cell metadata are stripped. Runs entirely in your browser.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="nbmd — notebook to markdown">
+<meta property="og:description" content="Drop a Jupyter .ipynb, get Markdown of code + notes. Plots stripped. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Enb%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible,input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.or{margin:1rem 0 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase}
+.src{
+  display:block;margin:.7rem 0 0;width:100%;min-height:9rem;max-height:20rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.opt{margin:.85rem 0 0;color:var(--muted);font-size:.9rem;display:flex;align-items:center;gap:.45rem}
+.opt input{margin:0}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.preview{
+  display:block;margin:0;width:100%;min-height:12rem;max-height:28rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / nbmd</p>
+    <h1>Notebook to markdown.</h1>
+    <p class="lede">Drop a Jupyter <code>.ipynb</code>. Copy Markdown of the code and notes.
+      Plots and cell metadata are stripped.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop a .ipynb here, or click to choose</strong>
+    Jupyter notebook JSON. Plots stay out of the Markdown.
+    <input id="file" type="file" accept=".ipynb,application/json,.json,application/x-ipynb+json" hidden>
+  </label>
+  <p class="or">or paste notebook JSON</p>
+  <textarea class="src" id="src" spellcheck="false" placeholder='{"nbformat": 4, "cells": […]}'></textarea>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <label class="opt"><input type="checkbox" id="placeholders"> keep image placeholders</label>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="copy">Copy .md</button>
+      <button type="button" id="dl">Download .md</button>
+    </div>
+    <textarea class="preview" id="preview" readonly aria-label="Markdown output"></textarea>
+  </div>
+  <footer>
+    <p>Caps: 50&nbsp;MB. Not-a-notebook files fail with an error.
+      Images, attachments, and cell metadata are stripped by default. Base64 is never embedded.</p>
+    <p><a href="https://github.com/kr3t3n/nbmd">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script>
+(function () {
+  "use strict";
+  var MAX = 50 * 1024 * 1024;
+  var MAX_OUT = 2000;
+  var IMAGE = { "image/png": 1, "image/jpeg": 1, "image/jpg": 1, "image/svg+xml": 1 };
+
+  function asText(v) {
+    if (v == null) return "";
+    if (Array.isArray(v)) return v.join("");
+    return String(v);
+  }
+  function shortText(s) {
+    if (s.length <= MAX_OUT) return s;
+    return s.slice(0, MAX_OUT) + "\n… [truncated " + (s.length - MAX_OUT) + " chars]";
+  }
+  function fenceLang(lang, body) {
+    var l = (lang || "text").replace(/[`\s]/g, "") || "text";
+    var src = body.replace(/\n+$/, "");
+    return "```" + l + "\n" + src + "\n```";
+  }
+  function kernelLang(nb) {
+    var md = nb && nb.metadata;
+    if (!md || typeof md !== "object") return "python";
+    var k = md.kernelspec && md.kernelspec.language;
+    if (k) return normalizeLang(k);
+    var n = md.language_info && md.language_info.name;
+    if (n) return normalizeLang(n);
+    return "python";
+  }
+  function normalizeLang(s) {
+    s = String(s).toLowerCase().trim();
+    if (s === "python3" || s === "ipython" || s === "ipython3") return "python";
+    if (s === "ir") return "r";
+    if (s === "javascript" || s === "nodejs" || s === "node") return "javascript";
+    return s || "python";
+  }
+  function cellLang(cell, fallback) {
+    var md = cell && cell.metadata;
+    if (md && typeof md === "object") {
+      if (typeof md.magics === "string" && md.magics) return normalizeLang(md.magics);
+      if (typeof md.magics_language === "string" && md.magics_language) return normalizeLang(md.magics_language);
+    }
+    var src = asText(cell && cell.source);
+    var m = src.match(/^%%(\w+)/);
+    if (m) return normalizeLang(m[1]);
+    return fallback;
+  }
+  function parseNotebook(text) {
+    var nb;
+    try { nb = JSON.parse(text); }
+    catch (e) { throw new Error("Not a notebook: invalid JSON."); }
+    if (!nb || typeof nb !== "object" || Array.isArray(nb)) {
+      throw new Error("Not a notebook: expected a JSON object.");
+    }
+    if (!Object.prototype.hasOwnProperty.call(nb, "cells")) {
+      throw new Error("Not a notebook: missing cells.");
+    }
+    if (!Array.isArray(nb.cells)) {
+      throw new Error("Not a notebook: cells must be an array.");
+    }
+    return nb;
+  }
+  function outputChunks(out, keepPlaceholders) {
+    var chunks = [];
+    if (!out || typeof out !== "object") return chunks;
+    var t = out.output_type;
+    if (t === "stream") {
+      var txt = shortText(asText(out.text));
+      if (txt) chunks.push(txt.replace(/\n+$/, ""));
+      return chunks;
+    }
+    if (t === "error") {
+      var lines = [];
+      if (out.ename || out.evalue) lines.push((out.ename || "Error") + (out.evalue ? ": " + out.evalue : ""));
+      var tb = asText(Array.isArray(out.traceback) ? out.traceback.join("\n") : out.traceback);
+      if (tb) lines.push(tb);
+      var err = shortText(lines.join("\n"));
+      if (err) chunks.push(err.replace(/\n+$/, ""));
+      return chunks;
+    }
+    if (t === "display_data" || t === "execute_result") {
+      var data = out.data || {};
+      var hasImg = false;
+      for (var mime in IMAGE) {
+        if (Object.prototype.hasOwnProperty.call(data, mime)) { hasImg = true; break; }
+      }
+      var plain = asText(data["text/plain"]);
+      if (plain) chunks.push(shortText(plain).replace(/\n+$/, ""));
+      if (hasImg && keepPlaceholders) chunks.push("<!-- image stripped -->");
+      return chunks;
+    }
+    return chunks;
+  }
+  function convert(nb, opts) {
+    opts = opts || {};
+    var keepPlaceholders = !!opts.keepPlaceholders;
+    var lang0 = kernelLang(nb);
+    var parts = [];
+    var cells = nb.cells;
+    var nMd = 0, nCode = 0, nRaw = 0, nStrip = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      if (!cell || typeof cell !== "object") continue;
+      var type = cell.cell_type;
+      var src = asText(cell.source);
+      if (type === "markdown") {
+        if (src.replace(/\s+$/, "")) { parts.push(src.replace(/\s+$/, "")); nMd++; }
+        continue;
+      }
+      if (type === "raw") {
+        if (src.replace(/\s+$/, "")) { parts.push(src.replace(/\s+$/, "")); nRaw++; }
+        continue;
+      }
+      if (type !== "code") continue;
+      nCode++;
+      var lang = cellLang(cell, lang0);
+      var block = [];
+      if (src.length) block.push(fenceLang(lang, src));
+      else block.push(fenceLang(lang, ""));
+      var outs = Array.isArray(cell.outputs) ? cell.outputs : [];
+      for (var j = 0; j < outs.length; j++) {
+        var o = outs[j];
+        if (o && o.data) {
+          for (var mime in IMAGE) {
+            if (Object.prototype.hasOwnProperty.call(o.data, mime)) { nStrip++; break; }
+          }
+        }
+        var bits = outputChunks(o, keepPlaceholders);
+        for (var k = 0; k < bits.length; k++) block.push(bits[k]);
+      }
+      parts.push(block.join("\n\n"));
+    }
+    return {
+      markdown: parts.join("\n\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "").replace(/\n+$/, "") + (parts.length ? "\n" : ""),
+      stats: { markdown: nMd, code: nCode, raw: nRaw, imagesStripped: nStrip, cells: cells.length }
+    };
+  }
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var srcEl = document.getElementById("src");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var countEl = document.getElementById("count");
+  var preview = document.getElementById("preview");
+  var copyBtn = document.getElementById("copy");
+  var dlBtn = document.getElementById("dl");
+  var phEl = document.getElementById("placeholders");
+  var lastName = "notebook.md";
+  var lastMd = "";
+  var timer = 0;
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    lastMd = "";
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function render(text) {
+    var nb = parseNotebook(text);
+    var r = convert(nb, { keepPlaceholders: phEl.checked });
+    lastMd = r.markdown;
+    preview.value = r.markdown;
+    var s = r.stats;
+    var bits = [s.cells + (s.cells === 1 ? " cell" : " cells")];
+    if (s.code) bits.push(s.code + (s.code === 1 ? " code" : " code"));
+    if (s.markdown) bits.push(s.markdown + " md");
+    if (s.imagesStripped) bits.push(s.imagesStripped + (s.imagesStripped === 1 ? " image stripped" : " images stripped"));
+    countEl.textContent = bits.join(" · ");
+    results.classList.remove("hidden");
+  }
+  function runFromTextarea() {
+    var text = srcEl.value;
+    if (!text.trim()) {
+      results.classList.add("hidden");
+      lastMd = "";
+      clearError();
+      return;
+    }
+    if (new Blob([text]).size > MAX) {
+      showError("Paste is larger than 50 MB.");
+      return;
+    }
+    try {
+      clearError();
+      render(text);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+  function looksBinary(buf) {
+    var n = Math.min(buf.byteLength, 8192);
+    var u = new Uint8Array(buf, 0, n);
+    var bad = 0;
+    for (var i = 0; i < n; i++) {
+      if (u[i] === 0) return true;
+      if (u[i] < 7 || (u[i] > 13 && u[i] < 32 && u[i] !== 9)) bad++;
+    }
+    return n > 0 && bad / n > 0.15;
+  }
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("File is larger than 50 MB.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      if (looksBinary(buf)) {
+        showError("That looks like a binary file. Drop a Jupyter .ipynb.");
+        return;
+      }
+      var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+      srcEl.value = text;
+      var base = (file.name || "notebook").replace(/\.[^.]+$/, "");
+      lastName = (base || "notebook") + ".md";
+      render(text);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    var f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  srcEl.addEventListener("input", function () {
+    lastName = "notebook.md";
+    clearTimeout(timer);
+    timer = setTimeout(runFromTextarea, 80);
+  });
+  srcEl.addEventListener("paste", function () {
+    lastName = "notebook.md";
+    setTimeout(runFromTextarea, 0);
+  });
+  phEl.addEventListener("change", function () {
+    if (srcEl.value.trim()) runFromTextarea();
+  });
+  copyBtn.addEventListener("click", function () {
+    if (!lastMd) return;
+    navigator.clipboard.writeText(lastMd).then(function () {
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = "Copy .md"; }, 1200);
+    });
+  });
+  dlBtn.addEventListener("click", function () {
+    var blob = new Blob([lastMd], { type: "text/markdown;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = lastName;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+
+  window.Nbmd = { convert: convert, parseNotebook: parseNotebook };
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "22caf862cb25465282e5f1e155b69037"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>
