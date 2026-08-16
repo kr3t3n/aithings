@@ -184,6 +184,49 @@ footer p{margin:.4rem 0 0}
       .slice(0, 80);
     return (s || "document") + ".md";
   }
+  function unescapeMammoth(md) {
+    // Mammoth escapes punctuation in text. Undo \. \- \( \) so
+    // URLs and hyphen bullets paste clean. Leave fenced code alone.
+    var parts = String(md || "").split(/(```[\s\S]*?```)/);
+    var i;
+    for (i = 0; i < parts.length; i++) {
+      if (parts[i].slice(0, 3) === "```") continue;
+      parts[i] = parts[i].replace(/\\([.\-()])/g, "$1");
+    }
+    return parts.join("");
+  }
+  function isBulletLine(line) {
+    return /^[ \t]*[-*+][ \t]+\S/.test(line);
+  }
+  function tightenBulletLists(md) {
+    var lines = String(md || "").split("\n");
+    var out = [];
+    var i = 0;
+    var j;
+    while (i < lines.length) {
+      if (isBulletLine(lines[i])) {
+        out.push(lines[i]);
+        i++;
+        while (i < lines.length) {
+          j = i;
+          while (j < lines.length && /^\s*$/.test(lines[j])) j++;
+          if (j < lines.length && j > i && isBulletLine(lines[j])) {
+            out.push(lines[j]);
+            i = j + 1;
+          } else {
+            break;
+          }
+        }
+      } else {
+        out.push(lines[i]);
+        i++;
+      }
+    }
+    return out.join("\n");
+  }
+  function cleanMarkdown(md) {
+    return tightenBulletLists(unescapeMammoth(md));
+  }
   function classify(buf, name) {
     var u = new Uint8Array(buf);
     var lower = String(name || "").toLowerCase();
@@ -238,6 +281,7 @@ footer p{margin:.4rem 0 0}
         }
       );
       var md = (result && result.value) ? String(result.value) : "";
+      md = cleanMarkdown(md);
       if (!md.replace(/\s+/g, "")) {
         throw new Error("The document converted to empty Markdown.");
       }
