@@ -18,6 +18,7 @@ open-source web tools.
 | [docxmd](https://aithings.online/docxmd/) | Drop a Word .docx or LibreOffice .odt, copy Markdown. | [kr3t3n/docxmd](https://github.com/kr3t3n/docxmd) |
 | [xlsxmd](https://aithings.online/xlsxmd/) | Drop an .xlsx, .csv, or .ods, copy Markdown tables. | [kr3t3n/xlsxmd](https://github.com/kr3t3n/xlsxmd) |
 | [harsan](https://aithings.online/harsan/) | Drop a .har, download a copy with cookies and Authorization stripped. | [kr3t3n/harsan](https://github.com/kr3t3n/harsan) |
+| [htmlmd](https://aithings.online/htmlmd/) | Drop a saved .html or SingleFile page, copy article Markdown. | [kr3t3n/htmlmd](https://github.com/kr3t3n/htmlmd) |
 
 ## What this repo is
 
@@ -35,6 +36,7 @@ served as a folder on aithings.online:
 - `/docxmd/`
 - `/xlsxmd/`
 - `/harsan/`
+- `/htmlmd/`
 
 flatten.site and makejson.online stay on their own domains. Source of truth for
 each tool is still its own repo; this tree is the public folder host.
