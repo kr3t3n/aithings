@@ -3,118 +3,148 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>aithings — small tools that do one thing</title>
-<meta name="description" content="A tiny bench of free, open-source web tools by Georgi Pepelyankov. No signup, no tracking.">
+<title>aithings.online</title>
+<meta name="description" content="A small bench of free, open-source web tools by Georgi Pepelyankov. No signup, no accounts, no tracking.">
 <meta name="author" content="Georgi Pepelyankov">
 <link rel="canonical" href="https://aithings.online/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aithings.online/">
-<meta property="og:title" content="aithings — small tools that do one thing">
-<meta property="og:description" content="A tiny bench of free, open-source web tools. No signup, no tracking.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A0%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="aithings.online">
+<meta property="og:description" content="A small bench of free, open-source web tools. No signup, no tracking.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d6b6b'/%3E%3Ctext x='16' y='23' font-family='monospace' font-size='19' fill='%23fff' text-anchor='middle'%3E%7B%7D%3C/text%3E%3C/svg%3E">
 <style>
   :root{
-    --bg:#fbfaf8; --panel:#ffffff; --ink:#16150f; --muted:#6a675c;
-    --line:#e6e2d8; --accent:#b4531a; --accent-soft:#fdf1e7;
-    --radius:14px;
-    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --paper:#f6f7f8;
+    --panel:#ffffff;
+    --ink:#11161b;
+    --muted:#59646e;
+    --rule:#dde1e5;
+    --accent:#0d6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --bg:#100f0d; --panel:#191815; --ink:#f2efe6; --muted:#9a958a;
-      --line:#2b2924; --accent:#e8894a; --accent-soft:#241a12;
+      --paper:#0d1115;
+      --panel:#141a20;
+      --ink:#e8edf1;
+      --muted:#8a95a0;
+      --rule:#222a31;
+      --accent:#4fd1c5;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#100f0d; --panel:#191815; --ink:#f2efe6; --muted:#9a958a;
-    --line:#2b2924; --accent:#e8894a; --accent-soft:#241a12;
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
   }
 
   *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
   body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font-family:var(--font); line-height:1.55;
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:640px; margin:0 auto; padding:clamp(2.5rem,9vw,5.5rem) 1.25rem 3rem}
+  a{color:var(--accent)}
+  a:focus-visible,.row:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 
-  header{margin-bottom:2.75rem}
-  .mark{
-    font-family:var(--mono); font-size:.75rem; letter-spacing:.14em;
-    text-transform:uppercase; color:var(--accent); margin:0 0 .85rem;
+  .page{max-width:37rem;margin:0 auto;padding:clamp(3rem,10vw,6rem) 1.25rem 3.5rem;display:flex;flex-direction:column;gap:3rem}
+
+  /* ---- header ---- */
+  .eyebrow{
+    font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);margin:0;
   }
   h1{
-    font-size:clamp(2rem,6.5vw,2.9rem); line-height:1.1;
-    margin:0 0 .7rem; letter-spacing:-.022em; font-weight:650;
+    font-family:var(--mono);
+    font-size:clamp(1.6rem,5.2vw,2.15rem);
+    font-weight:600;letter-spacing:-.02em;line-height:1.15;
+    margin:.75rem 0 0;text-wrap:balance;
   }
-  .lede{margin:0; color:var(--muted); font-size:1.05rem; max-width:34rem}
+  .lede{margin:.85rem 0 0;color:var(--muted);max-width:32rem}
 
-  .tools{list-style:none; margin:0 0 2.75rem; padding:0; display:grid; gap:.85rem}
-  .tool{
-    display:block; padding:1.35rem 1.45rem; text-decoration:none; color:inherit;
-    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
-    transition:border-color .15s ease, transform .15s ease;
+  /* ---- the bench: an index, one row per tool ---- */
+  .bench{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule)}
+  .row{
+    display:grid;gap:.3rem .9rem;
+    grid-template-columns:1fr auto;
+    align-items:baseline;
+    padding:1.4rem .25rem;
+    border-bottom:1px solid var(--rule);
+    text-decoration:none;color:inherit;
+    transition:background-color .14s ease,padding-left .14s ease;
   }
-  .tool:hover,.tool:focus-visible{border-color:var(--accent); transform:translateY(-2px)}
-  .tool:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
-  .tool-top{display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap}
-  .tool-name{font-family:var(--mono); font-size:1.06rem; font-weight:600; letter-spacing:-.01em}
-  .tool-go{margin-left:auto; color:var(--accent); font-size:1.05rem; line-height:1}
-  .tool-desc{margin:.4rem 0 0; color:var(--muted); font-size:.94rem}
-
-  .note{
-    margin:0 0 2.5rem; padding:.9rem 1.1rem; border-left:2px solid var(--line);
-    color:var(--muted); font-size:.87rem;
+  .row:hover,.row:focus-visible{background:var(--panel);padding-left:.7rem}
+  .name{font-family:var(--mono);font-size:1.02rem;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+  .row:hover .name{color:var(--accent)}
+  .arrow{font-family:var(--mono);color:var(--muted);font-size:.95rem}
+  .row:hover .arrow{color:var(--accent)}
+  .desc{grid-column:1/-1;margin:0;color:var(--muted);font-size:.93rem;max-width:30rem}
+  /* input → output signature: what the tool eats, what it emits */
+  .sig{
+    grid-column:1/-1;margin:.35rem 0 0;
+    font-family:var(--mono);font-size:.74rem;color:var(--muted);
+    letter-spacing:.02em;
   }
+  .sig b{font-weight:400;color:var(--accent)}
 
-  footer{border-top:1px solid var(--line); padding-top:1.5rem; font-size:.87rem; color:var(--muted)}
-  .links{display:flex; flex-wrap:wrap; gap:.4rem 1.15rem; margin:0 0 .9rem; padding:0; list-style:none}
-  footer a{color:var(--accent); text-decoration:none}
-  footer a:hover{text-decoration:underline}
+  /* ---- footer ---- */
+  footer{display:flex;flex-direction:column;gap:1.1rem;font-size:.87rem;color:var(--muted)}
+  .aside{margin:0;padding-left:.9rem;border-left:2px solid var(--rule)}
+  .meta{display:flex;flex-wrap:wrap;gap:.35rem 1.2rem;margin:0;padding:0;list-style:none;font-family:var(--mono);font-size:.8rem}
+  .meta a{text-decoration:none}
+  .meta a:hover{text-decoration:underline}
   .colophon{margin:0}
+
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="page">
 
   <header>
-    <p class="mark">aithings</p>
+    <p class="eyebrow">aithings.online</p>
     <h1>Small tools that do one thing.</h1>
-    <p class="lede">Free, open source, no signup, no accounts, no tracking. Built by
-      <a href="https://x.com/georgipep" style="color:var(--accent);text-decoration:none">Georgi</a>
-      because the tool didn't exist yet.</p>
+    <p class="lede">Free and open source. No signup, no accounts, nothing to install.
+      Built by <a href="https://x.com/georgipep">Georgi</a> because the tool didn't exist yet.</p>
   </header>
 
-  <ul class="tools">
-    <li>
-      <a class="tool" href="https://flatten.site">
-        <span class="tool-top">
-          <span class="tool-name">flatten.site</span>
-          <span class="tool-go" aria-hidden="true">&rarr;</span>
-        </span>
-        <p class="tool-desc">Drop in a ZIP, get a flat file tree or one plain-text blob. For pasting a whole codebase into an AI context window.</p>
-      </a>
-    </li>
-    <li>
-      <a class="tool" href="https://makejson.online">
-        <span class="tool-top">
-          <span class="tool-name">makejson.online</span>
-          <span class="tool-go" aria-hidden="true">&rarr;</span>
-        </span>
-        <p class="tool-desc">Turn PDFs, DOCX, spreadsheets and code files into structured JSON. Bring your own API key &mdash; it never leaves your browser.</p>
-      </a>
-    </li>
-  </ul>
+  <main class="bench">
+    <a class="row" href="https://flatten.site">
+      <span class="name">flatten.site</span>
+      <span class="arrow" aria-hidden="true">&rarr;</span>
+      <p class="desc">Drop in a ZIP and get back a flat file tree, or one plain-text blob with every
+        path inlined. For pasting a whole codebase into an AI context window without losing where
+        anything lived.</p>
+      <p class="sig"><b>in</b> .zip &nbsp;&nbsp;<b>out</b> .txt &middot; .zip</p>
+    </a>
 
-  <p class="note">
-    One tool at a time, shipped when it's useful to me. Anything nobody uses for 90 days gets retired rather than left to rot.
-  </p>
+    <a class="row" href="https://makejson.online">
+      <span class="name">makejson.online</span>
+      <span class="arrow" aria-hidden="true">&rarr;</span>
+      <p class="desc">Turn documents, spreadsheets and source files into structured JSON. Bring your
+        own OpenAI, Anthropic or Gemini key &mdash; the file is read in your browser and the key
+        never touches a server here.</p>
+      <p class="sig"><b>in</b> .pdf &middot; .docx &middot; .xlsx &middot; .csv &middot; .zip &middot; code &nbsp;&nbsp;<b>out</b> .json</p>
+    </a>
+  </main>
 
   <footer>
-    <ul class="links">
-      <li><a href="https://buymeacoffee.com/georgipep">Buy me a coffee &#9749;</a></li>
-      <li><a href="https://github.com/kr3t3n">Source on GitHub</a></li>
+    <p class="aside">One tool at a time, shipped when it becomes useful to me. Anything nobody
+      touches for 90 days gets retired rather than left to rot.</p>
+    <ul class="meta">
+      <li><a href="https://buymeacoffee.com/georgipep">buy me a coffee</a></li>
+      <li><a href="https://github.com/kr3t3n">source</a></li>
       <li><a href="https://x.com/georgipep">@georgipep</a></li>
     </ul>
     <p class="colophon">Every tool here is open source. Take it, fork it, run it yourself.</p>
