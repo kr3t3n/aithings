@@ -1,19 +1,20 @@
 # aithings
 
-The hub page for [aithings.online](https://aithings.online) — a small bench of free, open-source web tools.
-
-Currently listing two tools:
+The hub page for [aithings.online](https://aithings.online) — a small bench of free,
+open-source web tools.
 
 | Tool | What it does | Source |
 |---|---|---|
-| [flatten.site](https://flatten.site) | Drop in a ZIP, get a flat file tree or one plain-text blob — for pasting a codebase into an AI context window. | [kr3t3n/flatten.site](https://github.com/kr3t3n/flatten.site) |
-| [makejson.online](https://makejson.online) | Turn PDFs, DOCX, spreadsheets and code files into structured JSON, using your own AI API key. | [kr3t3n/makejson](https://github.com/kr3t3n/makejson) |
+| [flatten.site](https://flatten.site) | Drop in a ZIP, get a flat file tree or one plain-text blob — for pasting a codebase into an AI context window. | not yet published |
+| [makejson.online](https://makejson.online) | Turn PDFs, DOCX, spreadsheets and code into structured JSON, using your own AI API key. | [kr3t3n/makejson](https://github.com/kr3t3n/makejson) |
 
 ## What this repo is
 
-One file: `index.html`. No build step, no dependencies, no JavaScript. That is the whole hub.
+One file: `index.html`. No build step, no dependencies, no JavaScript, no tracking.
+That is the whole hub.
 
-New tools get added one at a time, and anything nobody uses for 90 days gets retired rather than left to rot.
+New tools get added one at a time, and anything nobody uses for 90 days gets retired
+rather than left to rot.
 
 ## Running it locally
 
@@ -23,11 +24,15 @@ Open `index.html` in a browser. That's it.
 
 The page is a single self-contained static file, so any static host works.
 
-**DreamHost (where `aithings.online` is hosted):** upload `index.html` to the domain's web root
-(`~/aithings.online/`) via SFTP or the DreamHost file manager. No DNS change needed.
+**DreamHost — where `aithings.online` is currently served from.** The domain resolves
+to DreamHost (`ns1/ns2/ns3.dreamhost.com`) and currently shows the default
+"almost here!" placeholder. Upload `index.html` to the domain's web root
+(`~/aithings.online/`) over SFTP or through the DreamHost file manager, replacing the
+placeholder. No DNS change is needed.
 
-**GitHub Pages:** already enabled on this repo, serving from `main`. To attach the custom domain,
-add a `CNAME` file containing `aithings.online` and point the domain's DNS at GitHub Pages.
+**GitHub Pages.** Push this repo, then enable Pages on `main` under Settings → Pages.
+To use the custom domain, add a `CNAME` file containing `aithings.online` and repoint
+the domain's DNS at GitHub Pages — which means moving it off the DreamHost default.
 
 ## Support
 
