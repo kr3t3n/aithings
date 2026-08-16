@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kindlemd — Kindle clippings to markdown</title>
+<meta name="description" content="Drop Kindle My Clippings.txt and get one Markdown file per book. Grouped, de-duped. Runs entirely in your browser.">
+<meta name="author" content="Georgi Pepelyankov">
+<meta property="og:type" content="website">
+<meta property="og:title" content="kindlemd — Kindle clippings to markdown">
+<meta property="og:description" content="Drop My Clippings.txt, get one .md per book. Files never leave the browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230d6b6b%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-family=%27monospace%27 font-size=%2713%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Emd%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#f6f7f8;
+  --panel:#ffffff;
+  --ink:#11161b;
+  --muted:#59646e;
+  --rule:#dde1e5;
+  --accent:#0d6b6b;
+  --danger:#9b1c1c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#0d1115;
+    --panel:#141a20;
+    --ink:#e8edf1;
+    --muted:#8a95a0;
+    --rule:#222a31;
+    --accent:#4fd1c5;
+    --danger:#f0a0a0;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+button,input,textarea{font:inherit}
+button{
+  background:var(--panel);
+  color:var(--ink);
+  border:1px solid var(--rule);
+  border-radius:6px;
+  padding:.35rem .7rem;
+  cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible,a:focus-visible,.drop:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;
+}
+.page{max-width:40rem;margin:0 auto;padding:clamp(2.4rem,8vw,4.5rem) 1.25rem 3.5rem}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h1{
+  font-family:var(--mono);
+  font-size:clamp(1.5rem,5vw,2rem);
+  font-weight:600;letter-spacing:-.02em;line-height:1.15;
+  margin:.7rem 0 0;
+}
+.lede{margin:.8rem 0 0;color:var(--muted)}
+.drop{
+  display:block;margin:1.6rem 0 0;padding:1.6rem 1.1rem;
+  border:1px dashed var(--rule);border-radius:8px;
+  background:var(--panel);text-align:center;cursor:pointer;
+  color:var(--muted);
+}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-weight:600;margin-bottom:.25rem}
+.or{margin:1rem 0 0;text-align:center;color:var(--muted);font-family:var(--mono);font-size:.74rem;letter-spacing:.12em;text-transform:uppercase}
+.src{
+  display:block;margin:.7rem 0 0;width:100%;min-height:8rem;max-height:18rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.privacy{margin:.85rem 0 0;color:var(--muted);font-size:.9rem}
+.err{
+  margin:1rem 0 0;padding:.75rem .9rem;border-left:3px solid var(--danger);
+  color:var(--danger);background:var(--panel);
+}
+.toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:1.3rem 0 .4rem}
+.count{font-family:var(--mono);font-size:.8rem;color:var(--muted);margin-right:auto}
+.list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
+.item{border-bottom:1px solid var(--rule)}
+.row{
+  display:grid;grid-template-columns:1fr auto;gap:.35rem .7rem;
+  padding:.85rem 0;align-items:baseline;
+}
+.name{font-family:var(--mono);font-size:.95rem;font-weight:600}
+.meta{grid-column:1/-1;margin:0;color:var(--muted);font-size:.82rem;font-family:var(--mono)}
+.actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.preview{
+  display:block;margin:0 0 .85rem;width:100%;min-height:12rem;max-height:24rem;
+  padding:.8rem .9rem;border:1px solid var(--rule);border-radius:8px;
+  background:var(--panel);color:var(--ink);
+  font-family:var(--mono);font-size:.8rem;line-height:1.45;resize:vertical;
+}
+.preview.hidden{display:none}
+footer{margin-top:2.4rem;font-size:.87rem;color:var(--muted)}
+footer p{margin:.4rem 0 0}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <p class="eyebrow"><a href="https://aithings.online">aithings</a> / kindlemd</p>
+    <h1>Kindle clippings to markdown.</h1>
+    <p class="lede">Drop <code>My Clippings.txt</code>. Get one <code>.md</code> per book,
+      grouped and de-duped.</p>
+  </header>
+  <label class="drop" id="drop" tabindex="0">
+    <strong>Drop My Clippings.txt here, or click to choose</strong>
+    From the Kindle: documents / My Clippings.txt
+    <input id="file" type="file" accept=".txt,text/plain" hidden>
+  </label>
+  <p class="or">or paste</p>
+  <textarea class="src" id="src" spellcheck="false" placeholder="Book Title (Author)
+- Your Highlight on page 12 | Location 123-125 | Added on Monday, January 1, 2024 10:00:00 AM
+
+highlighted text here
+=========="></textarea>
+  <p class="privacy">Files never leave the browser. There is no server and no account.</p>
+  <p class="err hidden" id="err" role="alert"></p>
+  <div id="results" class="hidden">
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <button type="button" id="all">Download all as ZIP</button>
+    </div>
+    <ul class="list" id="list"></ul>
+  </div>
+  <footer>
+    <p>Unknown locale or format fails with an error. English, Spanish, and German
+      metadata. File order (oldest-first). Caps: 50&nbsp;MB. Bookmarks skipped.</p>
+    <p><a href="https://github.com/kr3t3n/kindlemd">source</a>
+      · <a href="https://aithings.online">aithings.online</a>
+      · <a href="https://x.com/georgipep">Georgi</a></p>
+  </footer>
+</div>
+<script src="./vendor/jszip.js"></script>
+<script>
+(function () {
+  "use strict";
+  var MAX = 50 * 1024 * 1024;
+  var SEP = "==========";
+
+  var TYPE_PATTERNS = [
+    { kind: "highlight", re: /\b(?:your\s+highlight|tu\s+subrayado|su\s+subrayado|ihre\s+markierung|deine\s+markierung)\b/i },
+    { kind: "note", re: /\b(?:your\s+note|tu\s+nota|su\s+nota|ihre\s+notiz|deine\s+notiz)\b/i },
+    { kind: "bookmark", re: /\b(?:your\s+bookmark|tu\s+marcador|su\s+marcador|ihr\s+lesezeichen|dein\s+lesezeichen)\b/i }
+  ];
+
+  function looksBinary(buf) {
+    var n = Math.min(buf.byteLength, 8192);
+    var u = new Uint8Array(buf, 0, n);
+    var bad = 0;
+    for (var i = 0; i < n; i++) {
+      if (u[i] === 0) return true;
+      if (u[i] < 7 || (u[i] > 13 && u[i] < 32 && u[i] !== 9)) bad++;
+    }
+    return n > 0 && bad / n > 0.15;
+  }
+
+  function classifyMeta(line) {
+    var s = String(line || "").replace(/^\s*-\s*/, "");
+    for (var i = 0; i < TYPE_PATTERNS.length; i++) {
+      if (TYPE_PATTERNS[i].re.test(s)) return TYPE_PATTERNS[i].kind;
+    }
+    return null;
+  }
+
+  function parseTitleLine(line) {
+    var s = String(line || "").replace(/^\uFEFF/, "").trim();
+    var m = s.match(/^(.*) \(([^()]*)\)\s*$/);
+    if (m && m[1].trim()) return { title: m[1].trim(), author: m[2].trim() };
+    return { title: s || "Untitled", author: "" };
+  }
+
+  function bookKey(title, author) {
+    return (title || "").toLowerCase() + "\0" + (author || "").toLowerCase();
+  }
+
+  function isClippingLimit(text) {
+    return /clipping limit for this item/i.test(text || "");
+  }
+
+  function isMetaLooking(line) {
+    var s = String(line || "").trim();
+    if (!s) return false;
+    if (/^\s*-/.test(s)) return true;
+    return /\b(?:highlight|note|bookmark|subrayado|nota|marcador|markierung|notiz|lesezeichen|location|posición|position|page|página|seite)\b/i.test(s);
+  }
+
+  function parseClippings(text) {
+    if (text == null) throw new Error("Empty file.");
+    var raw = String(text).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    if (!raw.trim()) throw new Error("Empty file.");
+    if (raw.indexOf(SEP) === -1) {
+      throw new Error("Not a My Clippings.txt file: missing ========== separators.");
+    }
+    var chunks = raw.split(SEP);
+    var books = [];
+    var index = Object.create(null);
+    var sawMeta = false;
+    var unknownMeta = null;
+
+    for (var c = 0; c < chunks.length; c++) {
+      var block = chunks[c].replace(/^\n+/, "").replace(/\n+$/, "");
+      if (!block.trim()) continue;
+      var lines = block.split("\n");
+      var i = 0;
+      while (i < lines.length && !lines[i].trim()) i++;
+      if (i >= lines.length) continue;
+      var titleLine = lines[i++];
+      while (i < lines.length && !lines[i].trim()) i++;
+      if (i >= lines.length) continue;
+      var metaLine = lines[i];
+      var kind = classifyMeta(metaLine);
+      if (!kind) {
+        if (isMetaLooking(metaLine) || isMetaLooking(titleLine)) {
+          unknownMeta = (metaLine || titleLine).trim().slice(0, 120);
+        }
+        continue;
+      }
+      sawMeta = true;
+      i++;
+      while (i < lines.length && !lines[i].trim()) i++;
+      var body = lines.slice(i).join("\n").replace(/\s+$/, "").replace(/^\s+/, "");
+      if (kind === "bookmark") continue;
+      if (isClippingLimit(body)) continue;
+      if (kind === "highlight" && !body) continue;
+
+      var parsed = parseTitleLine(titleLine);
+      var key = bookKey(parsed.title, parsed.author);
+      var book = index[key];
+      if (!book) {
+        book = { title: parsed.title, author: parsed.author, items: [], seen: Object.create(null) };
+        index[key] = book;
+        books.push(book);
+      }
+      if (kind === "highlight") {
+        var norm = body.replace(/\s+/g, " ").trim();
+        if (book.seen[norm]) continue;
+        book.seen[norm] = true;
+      }
+      book.items.push({ kind: kind, text: body, meta: metaLine.trim() });
+    }
+
+    if (!sawMeta) {
+      var hint = unknownMeta ? " First unrecognised line: " + unknownMeta : "";
+      throw new Error("Unknown Kindle locale or format. Expected a metadata line like \"- Your Highlight\" / \"- Your Note\" (English, Spanish, or German)." + hint);
+    }
+
+    var kept = books.filter(function (b) { return b.items.length; });
+    if (!kept.length) {
+      throw new Error("No highlights or notes in this file (bookmarks only, or empty).");
+    }
+    return kept;
+  }
+
+  function toMarkdown(book) {
+    var out = [];
+    out.push("# " + (book.title || "Untitled"));
+    if (book.author) out.push("");
+    if (book.author) out.push(book.author);
+    out.push("");
+    for (var i = 0; i < book.items.length; i++) {
+      var it = book.items[i];
+      if (it.kind === "note") {
+        out.push("**Note**");
+        out.push("");
+        out.push(it.text || "");
+      } else {
+        var q = (it.text || "").split("\n").map(function (line) { return "> " + line; }).join("\n");
+        out.push(q || ">");
+      }
+      if (it.meta) {
+        out.push("");
+        out.push(it.meta.replace(/^\s*-\s*/, ""));
+      }
+      out.push("");
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "").replace(/\n+$/, "") + "\n";
+  }
+
+  function sanitiseFilename(name) {
+    var s = String(name || "untitled")
+      .replace(/[\/\\:*?"<>|\u0000-\u001f]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+/, "")
+      .slice(0, 80);
+    return s || "untitled";
+  }
+
+  function uniqueFilenames(books) {
+    var used = Object.create(null);
+    return books.map(function (book) {
+      var base = sanitiseFilename(book.title);
+      var name = base + ".md";
+      var n = 2;
+      while (used[name.toLowerCase()]) {
+        name = base + "-" + n + ".md";
+        n += 1;
+      }
+      used[name.toLowerCase()] = true;
+      return name;
+    });
+  }
+
+  var drop = document.getElementById("drop");
+  var input = document.getElementById("file");
+  var srcEl = document.getElementById("src");
+  var errEl = document.getElementById("err");
+  var results = document.getElementById("results");
+  var listEl = document.getElementById("list");
+  var countEl = document.getElementById("count");
+  var allBtn = document.getElementById("all");
+  var books = [];
+  var files = [];
+  var timer = 0;
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove("hidden");
+    results.classList.add("hidden");
+    books = [];
+    files = [];
+  }
+  function clearError() {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  function downloadBlob(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+  function render() {
+    files = uniqueFilenames(books);
+    var nH = 0, nN = 0;
+    books.forEach(function (b) {
+      b.items.forEach(function (it) {
+        if (it.kind === "note") nN++;
+        else nH++;
+      });
+    });
+    countEl.textContent = books.length + (books.length === 1 ? " book" : " books")
+      + " · " + nH + (nH === 1 ? " highlight" : " highlights")
+      + (nN ? " · " + nN + (nN === 1 ? " note" : " notes") : "");
+    listEl.innerHTML = "";
+    books.forEach(function (book, i) {
+      var li = document.createElement("li");
+      li.className = "item";
+      var row = document.createElement("div");
+      row.className = "row";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = book.title || "Untitled";
+      var actions = document.createElement("span");
+      actions.className = "actions";
+      [["view", "View"], ["copy", "Copy"], ["dl", "Download"]].forEach(function (pair) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("data-act", pair[0]);
+        btn.setAttribute("data-i", String(i));
+        btn.textContent = pair[1];
+        actions.appendChild(btn);
+      });
+      var meta = document.createElement("p");
+      meta.className = "meta";
+      var bits = [];
+      if (book.author) bits.push(book.author);
+      var h = 0, n = 0;
+      book.items.forEach(function (it) { if (it.kind === "note") n++; else h++; });
+      bits.push(h + (h === 1 ? " highlight" : " highlights"));
+      if (n) bits.push(n + (n === 1 ? " note" : " notes"));
+      bits.push(files[i]);
+      meta.textContent = bits.join(" · ");
+      row.appendChild(name);
+      row.appendChild(actions);
+      row.appendChild(meta);
+      var preview = document.createElement("textarea");
+      preview.className = "preview hidden";
+      preview.readOnly = true;
+      preview.setAttribute("aria-label", "Markdown preview");
+      li.appendChild(row);
+      li.appendChild(preview);
+      listEl.appendChild(li);
+    });
+    results.classList.remove("hidden");
+  }
+  function runText(text) {
+    books = parseClippings(text);
+    render();
+  }
+  function runFromTextarea() {
+    var text = srcEl.value;
+    if (!text.trim()) {
+      results.classList.add("hidden");
+      books = [];
+      files = [];
+      clearError();
+      return;
+    }
+    if (new Blob([text]).size > MAX) {
+      showError("Paste is larger than 50 MB.");
+      return;
+    }
+    try {
+      clearError();
+      runText(text);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+  async function handleFile(file) {
+    clearError();
+    if (!file) return;
+    if (file.size > MAX) {
+      showError("File is larger than 50 MB.");
+      return;
+    }
+    try {
+      var buf = await file.arrayBuffer();
+      if (looksBinary(buf)) {
+        showError("That looks like a binary file. Drop a My Clippings.txt.");
+        return;
+      }
+      var text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+      srcEl.value = text;
+      runText(text);
+    } catch (e) {
+      showError(e.message || String(e));
+    }
+  }
+
+  drop.addEventListener("click", function () { input.click(); });
+  drop.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  input.addEventListener("change", function () {
+    if (input.files && input.files[0]) handleFile(input.files[0]);
+    input.value = "";
+  });
+  srcEl.addEventListener("input", function () {
+    clearTimeout(timer);
+    timer = setTimeout(runFromTextarea, 80);
+  });
+  srcEl.addEventListener("paste", function () {
+    setTimeout(runFromTextarea, 0);
+  });
+
+  function hidePreviews(except) {
+    listEl.querySelectorAll(".preview").forEach(function (el) {
+      if (el !== except) el.classList.add("hidden");
+    });
+  }
+  function previewFor(btn) {
+    var item = btn.closest(".item");
+    return item ? item.querySelector(".preview") : null;
+  }
+  function showPreview(btn, md, select) {
+    var box = previewFor(btn);
+    if (!box) return;
+    hidePreviews(box);
+    box.value = md;
+    box.classList.remove("hidden");
+    if (select) {
+      box.focus();
+      box.select();
+    }
+  }
+
+  listEl.addEventListener("click", async function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    var i = Number(btn.getAttribute("data-i"));
+    var act = btn.getAttribute("data-act");
+    var md = toMarkdown(books[i]);
+    if (act === "copy") {
+      showPreview(btn, md, false);
+      try {
+        await navigator.clipboard.writeText(md);
+        btn.textContent = "Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+      } catch (err) {
+        showPreview(btn, md, true);
+      }
+    } else if (act === "dl") {
+      downloadBlob(new Blob([md], { type: "text/markdown;charset=utf-8" }), files[i]);
+    } else if (act === "view") {
+      var box = previewFor(btn);
+      if (box && !box.classList.contains("hidden") && box.value === md) {
+        box.classList.add("hidden");
+        return;
+      }
+      showPreview(btn, md, false);
+    }
+  });
+
+  allBtn.addEventListener("click", async function () {
+    if (!books.length) return;
+    var zip = new JSZip();
+    books.forEach(function (book, i) {
+      zip.file(files[i], toMarkdown(book));
+    });
+    var blob = await zip.generateAsync({ type: "blob" });
+    downloadBlob(blob, "kindlemd.zip");
+  });
+
+  window.KindleMD = { parse: parseClippings, toMarkdown: toMarkdown, uniqueFilenames: uniqueFilenames };
+})();
+</script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "487cd22677884dd6a661a0c28cc60738"}'></script><!-- End Cloudflare Web Analytics -->
+</body>
+</html>

@@ -14,6 +14,7 @@ open-source web tools.
 | [nbmd](https://aithings.online/nbmd/) | Drop a Jupyter .ipynb, get Markdown of code + notes. Plots stripped. | [kr3t3n/nbmd](https://github.com/kr3t3n/nbmd) |
 | [heicjpg](https://aithings.online/heicjpg/) | Drop iPhone .heic photos, get JPEGs. | [kr3t3n/heicjpg](https://github.com/kr3t3n/heicjpg) |
 | [healthcsv](https://aithings.online/healthcsv/) | Drop an Apple Health export, click a preset (or pick types + dates), get a compact CSV/JSON. | [kr3t3n/healthcsv](https://github.com/kr3t3n/healthcsv) |
+| [kindlemd](https://aithings.online/kindlemd/) | Drop Kindle My Clippings.txt, get one Markdown file per book. | [kr3t3n/kindlemd](https://github.com/kr3t3n/kindlemd) |
 
 ## What this repo is
 
@@ -27,6 +28,7 @@ served as a folder on aithings.online:
 - `/nbmd/`
 - `/heicjpg/`
 - `/healthcsv/`
+- `/kindlemd/`
 
 flatten.site and makejson.online stay on their own domains. Source of truth for
 each tool is still its own repo; this tree is the public folder host.
