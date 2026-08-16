@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aithings — small tools that do one thing</title>
+<meta name="description" content="A tiny bench of free, open-source web tools by Georgi Pepelyankov. No signup, no tracking.">
+<meta name="author" content="Georgi Pepelyankov">
+<link rel="canonical" href="https://aithings.online/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aithings.online/">
+<meta property="og:title" content="aithings — small tools that do one thing">
+<meta property="og:description" content="A tiny bench of free, open-source web tools. No signup, no tracking.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A0%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#fbfaf8; --panel:#ffffff; --ink:#16150f; --muted:#6a675c;
+    --line:#e6e2d8; --accent:#b4531a; --accent-soft:#fdf1e7;
+    --radius:14px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#100f0d; --panel:#191815; --ink:#f2efe6; --muted:#9a958a;
+      --line:#2b2924; --accent:#e8894a; --accent-soft:#241a12;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#100f0d; --panel:#191815; --ink:#f2efe6; --muted:#9a958a;
+    --line:#2b2924; --accent:#e8894a; --accent-soft:#241a12;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:clamp(2.5rem,9vw,5.5rem) 1.25rem 3rem}
+
+  header{margin-bottom:2.75rem}
+  .mark{
+    font-family:var(--mono); font-size:.75rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 .85rem;
+  }
+  h1{
+    font-size:clamp(2rem,6.5vw,2.9rem); line-height:1.1;
+    margin:0 0 .7rem; letter-spacing:-.022em; font-weight:650;
+  }
+  .lede{margin:0; color:var(--muted); font-size:1.05rem; max-width:34rem}
+
+  .tools{list-style:none; margin:0 0 2.75rem; padding:0; display:grid; gap:.85rem}
+  .tool{
+    display:block; padding:1.35rem 1.45rem; text-decoration:none; color:inherit;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    transition:border-color .15s ease, transform .15s ease;
+  }
+  .tool:hover,.tool:focus-visible{border-color:var(--accent); transform:translateY(-2px)}
+  .tool:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+  .tool-top{display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap}
+  .tool-name{font-family:var(--mono); font-size:1.06rem; font-weight:600; letter-spacing:-.01em}
+  .tool-go{margin-left:auto; color:var(--accent); font-size:1.05rem; line-height:1}
+  .tool-desc{margin:.4rem 0 0; color:var(--muted); font-size:.94rem}
+
+  .note{
+    margin:0 0 2.5rem; padding:.9rem 1.1rem; border-left:2px solid var(--line);
+    color:var(--muted); font-size:.87rem;
+  }
+
+  footer{border-top:1px solid var(--line); padding-top:1.5rem; font-size:.87rem; color:var(--muted)}
+  .links{display:flex; flex-wrap:wrap; gap:.4rem 1.15rem; margin:0 0 .9rem; padding:0; list-style:none}
+  footer a{color:var(--accent); text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  .colophon{margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="mark">aithings</p>
+    <h1>Small tools that do one thing.</h1>
+    <p class="lede">Free, open source, no signup, no accounts, no tracking. Built by
+      <a href="https://x.com/georgipep" style="color:var(--accent);text-decoration:none">Georgi</a>
+      because the tool didn't exist yet.</p>
+  </header>
+
+  <ul class="tools">
+    <li>
+      <a class="tool" href="https://flatten.site">
+        <span class="tool-top">
+          <span class="tool-name">flatten.site</span>
+          <span class="tool-go" aria-hidden="true">&rarr;</span>
+        </span>
+        <p class="tool-desc">Drop in a ZIP, get a flat file tree or one plain-text blob. For pasting a whole codebase into an AI context window.</p>
+      </a>
+    </li>
+    <li>
+      <a class="tool" href="https://makejson.online">
+        <span class="tool-top">
+          <span class="tool-name">makejson.online</span>
+          <span class="tool-go" aria-hidden="true">&rarr;</span>
+        </span>
+        <p class="tool-desc">Turn PDFs, DOCX, spreadsheets and code files into structured JSON. Bring your own API key &mdash; it never leaves your browser.</p>
+      </a>
+    </li>
+  </ul>
+
+  <p class="note">
+    One tool at a time, shipped when it's useful to me. Anything nobody uses for 90 days gets retired rather than left to rot.
+  </p>
+
+  <footer>
+    <ul class="links">
+      <li><a href="https://buymeacoffee.com/georgipep">Buy me a coffee &#9749;</a></li>
+      <li><a href="https://github.com/kr3t3n">Source on GitHub</a></li>
+      <li><a href="https://x.com/georgipep">@georgipep</a></li>
+    </ul>
+    <p class="colophon">Every tool here is open source. Take it, fork it, run it yourself.</p>
+  </footer>
+
+</div>
+</body>
+</html>
