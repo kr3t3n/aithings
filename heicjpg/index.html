@@ -227,42 +227,69 @@ footer p{margin:.4rem 0 0}
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
   }
-  function decoderReady() {
-    return typeof libheif !== "undefined" && libheif && typeof libheif.HeifDecoder === "function";
+  var heifApi = null;
+  var heifWait = null;
+  function loadHeif() {
+    if (heifApi) return Promise.resolve(heifApi);
+    if (heifWait) return heifWait;
+    if (typeof libheif === "undefined" || !libheif) {
+      return Promise.reject(new Error("HEIC decoder failed to load."));
+    }
+    var inst = libheif;
+    if (typeof libheif === "function" && typeof libheif.HeifDecoder !== "function") {
+      try { inst = libheif(); } catch (e) {
+        return Promise.reject(new Error("HEIC decoder failed to load."));
+      }
+    }
+    heifWait = Promise.resolve(inst).then(function (api) {
+      if (api && typeof api.HeifDecoder !== "function" && api.default) api = api.default;
+      if (api && typeof api === "function" && typeof api.HeifDecoder !== "function") {
+        return Promise.resolve(api());
+      }
+      return api;
+    }).then(function (api) {
+      if (!api || typeof api.HeifDecoder !== "function") {
+        throw new Error("HEIC decoder failed to load.");
+      }
+      heifApi = api;
+      return api;
+    });
+    return heifWait;
   }
   function decodeToJpeg(buf, q) {
-    if (!decoderReady()) return Promise.reject(new Error("HEIC decoder failed to load."));
-    var decoder = new libheif.HeifDecoder();
-    var images;
-    try { images = decoder.decode(new Uint8Array(buf)); }
-    catch (e) { return Promise.reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder.")); }
-    if (!images || !images.length) {
-      return Promise.reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."));
-    }
-    var image = images[0];
-    var width = image.get_width();
-    var height = image.get_height();
-    if (!width || !height) return Promise.reject(new Error("HEIC has no image size."));
-    var canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    var ctx = canvas.getContext("2d");
-    var imageData = ctx.createImageData(width, height);
-    return new Promise(function (resolve, reject) {
-      image.display(imageData, function (displayData) {
-        if (!displayData) {
-          reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."));
-          return;
-        }
-        ctx.putImageData(displayData, 0, 0);
-        if (!canvas.toBlob) {
-          reject(new Error("This browser cannot encode JPEG."));
-          return;
-        }
-        canvas.toBlob(function (blob) {
-          if (!blob) { reject(new Error("JPEG encode failed.")); return; }
-          resolve(blob);
-        }, "image/jpeg", q);
+    return loadHeif().then(function (api) {
+      var decoder = new api.HeifDecoder();
+      var images;
+      try { images = decoder.decode(new Uint8Array(buf)); }
+      catch (e) { throw new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."); }
+      if (!images || !images.length) {
+        throw new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder.");
+      }
+      var image = images[0];
+      var width = image.get_width();
+      var height = image.get_height();
+      if (!width || !height) throw new Error("HEIC has no image size.");
+      var canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      var ctx = canvas.getContext("2d");
+      var imageData = ctx.createImageData(width, height);
+      return new Promise(function (resolve, reject) {
+        image.display(imageData, function (displayData) {
+          if (!displayData) {
+            reject(new Error("Could not decode this HEIC. Some iOS 18 files fail in the browser decoder."));
+            return;
+          }
+          ctx.putImageData(displayData, 0, 0);
+          if (!canvas.toBlob) {
+            reject(new Error("This browser cannot encode JPEG."));
+            return;
+          }
+          canvas.toBlob(function (blob) {
+            if (!blob) { reject(new Error("JPEG encode failed.")); return; }
+            resolve(blob);
+          }, "image/jpeg", q);
+        });
       });
     });
   }
@@ -407,6 +434,7 @@ footer p{margin:.4rem 0 0}
       downloadBlob(blob, "heicjpg.zip");
     });
   });
+  loadHeif().catch(function () {});
 })();
 </script>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "06a8023403ad4e459798d369b21a7cb7"}'></script><!-- End Cloudflare Web Analytics -->
